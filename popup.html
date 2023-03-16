@@ -18,8 +18,7 @@
             border-collapse: collapse;
         }
 
-        th,
-        td {
+        th,td {
             border: 1px solid #ccc;
             padding: 8px;
             text-align: left;
@@ -32,6 +31,12 @@
         tr:nth-child(even) {
             background-color: #f2f2f2;
         }
+
+        .url-wrap {
+            max-width: 150px;
+            word-wrap: break-word;
+            word-break: break-word;
+        }
     </style>
 </head>
 
@@ -40,6 +45,7 @@
     <table>
         <thead>
             <tr>
+                <th>Title</th>
                 <th>Bookmark</th>
                 <th>Clicks</th>
             </tr>

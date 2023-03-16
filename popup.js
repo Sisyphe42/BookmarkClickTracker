@@ -1,23 +1,32 @@
 document.addEventListener("DOMContentLoaded", () => {
     const sortButton = document.getElementById("sortButton");
-    let sortOrderDescending = false;
+    let sortOrder = "default";
 
     sortButton.addEventListener("click", () => {
-        sortOrderDescending = !sortOrderDescending;
-        displayBookmarkList(sortOrderDescending);
+        if (sortOrder === "default") {
+            sortOrder = "descending";
+            sortButton.textContent = "Sort by Clicks ⏷";
+        } else if (sortOrder === "descending") {
+            sortOrder = "ascending";
+            sortButton.textContent = "Sort by Clicks ⏶";
+        } else {
+            sortOrder = "default";
+            sortButton.textContent = "Sort by Clicks";
+        }
+        displayBookmarkList(sortOrder);
     });
 
-    displayBookmarkList(sortOrderDescending);
+    displayBookmarkList(sortOrder);
 });
 
-function displayBookmarkList(sortOrderDescending) {
+function displayBookmarkList(sortOrder) {
     chrome.storage.sync.get("clickCounts", (data) => {
         const clickCounts = data.clickCounts || {};
         const sortedClickCounts = Object.entries(clickCounts);
 
-        if (sortOrderDescending) {
+        if (sortOrder === "descending") {
             sortedClickCounts.sort((a, b) => b[1] - a[1]);
-        } else {
+        } else if (sortOrder === "ascending") {
             sortedClickCounts.sort((a, b) => a[1] - b[1]);
         }
 
@@ -25,21 +34,34 @@ function displayBookmarkList(sortOrderDescending) {
         bookmarkList.innerHTML = "";
 
         sortedClickCounts.forEach(([url, clicks]) => {
-            const row = document.createElement("tr");
+            chrome.bookmarks.search({ url }, (results) => {
+                if (results.length > 0) {
+                    const bookmarkTitle = results[0].title;
 
-            const urlCell = document.createElement("td");
-            const urlLink = document.createElement("a");
-            urlLink.href = url;
-            urlLink.textContent = url;
-            urlLink.target = "_blank";
-            urlCell.appendChild(urlLink);
-            row.appendChild(urlCell);
+                    const row = document.createElement("tr");
 
-            const clicksCell = document.createElement("td");
-            clicksCell.textContent = clicks;
-            row.appendChild(clicksCell);
+                    const titleCell = document.createElement("td");
+                    titleCell.textContent = bookmarkTitle;
+                    row.appendChild(titleCell);
 
-            bookmarkList.appendChild(row);
+                    const urlCell = document.createElement("td");
+                    const urlDiv = document.createElement("div");
+                    urlDiv.classList.add("url-wrap");
+                    const urlLink = document.createElement("a");
+                    urlLink.href = url;
+                    urlLink.textContent = url;
+                    urlLink.target = "_blank";
+                    urlDiv.appendChild(urlLink);
+                    urlCell.appendChild(urlDiv);
+                    row.appendChild(urlCell);
+
+                    const clicksCell = document.createElement("td");
+                    clicksCell.textContent = clicks;
+                    row.appendChild(clicksCell);
+
+                    bookmarkList.appendChild(row);
+                }
+            });
         });
     });
 }
