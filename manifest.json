@@ -4,7 +4,6 @@
   "version": "1.0",
   "description": "Counts the number of times bookmarks are clicked.",
   "permissions": [
-    "tabs",
     "bookmarks",
     "storage",
     "unlimitedStorage",
