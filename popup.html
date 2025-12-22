@@ -6,53 +6,637 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bookmark Click Counter</title>
     <style>
+        * {
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: Arial, sans-serif;
-            width: 300px;
-            height: 400px;
+            font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+            width: 400px;
+            height: 600px;
             overflow-y: auto;
+            margin: 0;
+            padding: 0;
+            background-color: #fafafa;
+            color: rgba(0, 0, 0, 0.87);
+        }
+
+        .header {
+            padding: 16px;
+            background-color: #fff;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin-bottom: 8px;
+        }
+
+        .search-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .search-box {
+            flex: 1;
+            padding: 12px 16px;
+            border: none;
+            border-bottom: 2px solid rgba(0, 0, 0, 0.12);
+            border-radius: 0;
+            font-size: 14px;
+            background-color: transparent;
+            transition: border-color 0.3s ease;
+            outline: none;
+        }
+
+        .search-box:focus {
+            border-bottom-color: #1976d2;
+        }
+
+        .search-box::placeholder {
+            color: rgba(0, 0, 0, 0.38);
+        }
+
+        .filter-container {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .filter-label {
+            font-size: 12px;
+            color: rgba(0, 0, 0, 0.6);
+            font-weight: 500;
+        }
+
+        .filter-chips {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            flex: 1;
+        }
+
+        .filter-chip {
+            padding: 4px 12px;
+            border-radius: 16px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 1px solid rgba(0, 0, 0, 0.12);
+            background-color: #fff;
+            color: rgba(0, 0, 0, 0.87);
+            user-select: none;
+        }
+
+        .filter-chip:hover {
+            background-color: rgba(0, 0, 0, 0.04);
+        }
+
+        .filter-chip.active {
+            background-color: #1976d2;
+            color: #fff;
+            border-color: #1976d2;
+        }
+
+        .filter-chip.clear-all {
+            background-color: transparent;
+            border-color: rgba(0, 0, 0, 0.12);
+            color: rgba(0, 0, 0, 0.6);
+        }
+
+        .filter-chip.clear-all:hover {
+            background-color: rgba(0, 0, 0, 0.04);
+        }
+
+        .date-filter {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .date-filter-label {
+            font-size: 12px;
+            color: rgba(0, 0, 0, 0.6);
+            font-weight: 500;
+        }
+
+        .date-filter-select {
+            padding: 6px 12px;
+            border: 1px solid rgba(0, 0, 0, 0.12);
+            border-radius: 4px;
+            font-size: 12px;
+            background-color: #fff;
+            color: rgba(0, 0, 0, 0.87);
+            cursor: pointer;
+            outline: none;
+            transition: border-color 0.2s ease;
+        }
+
+        .date-filter-select:hover {
+            border-color: rgba(0, 0, 0, 0.3);
+        }
+
+        .date-filter-select:focus {
+            border-color: #1976d2;
+        }
+
+        .chart-container {
+            background-color: #fff;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+        }
+
+        .chart-title {
+            font-size: 14px;
+            font-weight: 500;
+            color: rgba(0, 0, 0, 0.87);
+            margin-bottom: 12px;
+        }
+
+        .chart-wrapper {
+            position: relative;
+            height: 200px;
+            width: 100%;
+        }
+
+        .chart-wrapper canvas {
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        .chart-empty {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 200px;
+            color: rgba(0, 0, 0, 0.38);
+            font-size: 13px;
+        }
+
+        .charts-section {
+            padding: 0 16px 16px;
+        }
+
+        .stats-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+        }
+
+        .stats {
+            background-color: #fff;
+            padding: 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+            flex: 1;
+            transition: box-shadow 0.3s ease;
+        }
+
+        .stats:hover {
+            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.16), 0 3px 6px rgba(0, 0, 0, 0.23);
+        }
+
+        .stats-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            color: rgba(0, 0, 0, 0.87);
+        }
+
+        .stats-row span:last-child {
+            font-weight: 500;
+            color: #1976d2;
+        }
+
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            background-color: transparent;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: background-color 0.2s ease, box-shadow 0.2s ease;
+            outline: none;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .menu-button {
+            color: rgba(0, 0, 0, 0.54);
+            padding: 4px 8px;
+            min-width: auto;
+            font-size: 18px;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-transform: none;
+            letter-spacing: normal;
+            font-weight: 400;
+        }
+
+        .menu-button:hover {
+            background-color: rgba(0, 0, 0, 0.08);
+            color: rgba(0, 0, 0, 0.87);
+        }
+
+        .menu-button:active {
+            background-color: rgba(0, 0, 0, 0.12);
+        }
+
+        .sortable-header {
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+            padding: 12px 16px;
+            font-weight: 500;
+            font-size: 12px;
+            color: rgba(0, 0, 0, 0.87);
+            transition: background-color 0.2s ease;
+            text-align: center;
+        }
+
+        .sortable-header:hover {
+            background-color: rgba(0, 0, 0, 0.04);
+        }
+
+        .sortable-header::after {
+            content: '⮃';
+            display: inline-block;
+            margin-left: 4px;
+            opacity: 0.38;
+            font-size: 16px;
+            transition: opacity 0.2s ease;
+        }
+
+        .sortable-header:hover::after {
+            opacity: 0.87;
+        }
+
+        .sortable-header.sort-asc::after {
+            content: ' ⏶';
+            opacity: 0.87;
+            color: #1976d2;
+        }
+
+        .sortable-header.sort-desc::after {
+            content: ' ⏷';
+            opacity: 0.87;
+            color: #1976d2;
         }
 
         table {
             width: 100%;
             border-collapse: collapse;
+            font-size: 13px;
+            background-color: #fff;
         }
 
-        th,td {
-            border: 1px solid #ccc;
-            padding: 8px;
+        th, td {
+            padding: 12px 16px;
             text-align: left;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+        }
+
+        th.sortable-header {
+            text-align: center;
         }
 
         th {
-            background-color: #f2f2f2;
+            background-color: #fff;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            font-weight: 500;
+            color: rgba(0, 0, 0, 0.87);
         }
 
-        tr:nth-child(even) {
-            background-color: #f2f2f2;
+        tbody tr {
+            transition: background-color 0.2s ease;
+        }
+
+        tbody tr:hover {
+            background-color: rgba(0, 0, 0, 0.04);
+        }
+
+        tbody tr:last-child td {
+            border-bottom: none;
         }
 
         .url-wrap {
-            max-width: 150px;
+            max-width: 180px;
             word-wrap: break-word;
             word-break: break-word;
+        }
+
+        .url-wrap a {
+            color: #1976d2;
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        .url-wrap a:hover {
+            color: #1565c0;
+            text-decoration: underline;
+        }
+
+        .time-info {
+            font-size: 12px;
+            color: rgba(0, 0, 0, 0.6);
+            cursor: help;
+            transition: color 0.2s ease;
+        }
+
+        .time-info:hover {
+            color: rgba(0, 0, 0, 0.87);
+        }
+
+        .tooltip {
+            position: relative;
+            display: inline-block;
+        }
+
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 200px;
+            background-color: #424242;
+            color: #fff;
+            text-align: left;
+            border-radius: 4px;
+            padding: 8px 12px;
+            position: absolute;
+            z-index: 1000;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -100px;
+            opacity: 0;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            transform: translateY(-4px);
+            font-size: 12px;
+            line-height: 1.4;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .menu-container {
+            position: relative;
+            display: inline-block;
+        }
+
+        .dropdown-menu {
+            display: none;
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: #fff;
+            border-radius: 4px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2), 0 2px 4px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            min-width: 150px;
+            margin-top: 5px;
+        }
+
+        .dropdown-menu.show {
+            display: block;
+            animation: fadeIn 0.2s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .dropdown-menu button {
+            width: 100%;
+            text-align: left;
+            border: none;
+            border-radius: 0;
+            padding: 12px 16px;
+            background: #fff;
+            min-width: auto;
+            flex: none;
+            white-space: nowrap;
+            color: rgba(0, 0, 0, 0.87);
+            text-transform: none;
+            letter-spacing: normal;
+            font-weight: 400;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+        }
+
+        .dropdown-menu button:last-child {
+            border-bottom: none;
+        }
+
+        .dropdown-menu button:hover {
+            background-color: rgba(0, 0, 0, 0.04);
+        }
+
+        .dropdown-menu button:active {
+            background-color: rgba(0, 0, 0, 0.08);
+        }
+
+        .action-menu {
+            position: relative;
+            display: inline-block;
+        }
+
+        .action-button {
+            padding: 4px 8px;
+            font-size: 18px;
+            min-width: auto;
+            flex: none;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            color: rgba(0, 0, 0, 0.54);
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.2s ease;
+        }
+
+        .action-button:hover {
+            background-color: rgba(0, 0, 0, 0.08);
+            color: rgba(0, 0, 0, 0.87);
+        }
+
+        .action-button:active {
+            background-color: rgba(0, 0, 0, 0.12);
+        }
+
+        .action-dropdown {
+            display: none;
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: #fff;
+            border-radius: 4px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2), 0 2px 4px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            min-width: 120px;
+            margin-top: 4px;
+            overflow: hidden;
+        }
+
+        .action-dropdown.show {
+            display: block;
+            animation: fadeIn 0.2s ease;
+        }
+
+        .action-dropdown button {
+            width: 100%;
+            text-align: left;
+            border: none;
+            border-radius: 0;
+            padding: 10px 16px;
+            background: #fff;
+            min-width: auto;
+            flex: none;
+            font-size: 13px;
+            color: rgba(0, 0, 0, 0.87);
+            text-transform: none;
+            letter-spacing: normal;
+            font-weight: 400;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+        }
+
+        .action-dropdown button:last-child {
+            border-bottom: none;
+        }
+
+        .action-dropdown button:hover {
+            background-color: rgba(0, 0, 0, 0.04);
+        }
+
+        .action-dropdown button:active {
+            background-color: rgba(0, 0, 0, 0.08);
         }
     </style>
 </head>
 
 <body>
-    <button id="sortButton">Sort by Clicks</button>
-    <table>
-        <thead>
-            <tr>
-                <th>Title</th>
-                <th>Bookmark</th>
-                <th>Clicks</th>
-            </tr>
-        </thead>
-        <tbody id="bookmarkList">
-        </tbody>
-    </table>
+    <div class="header">
+        <div class="search-container">
+            <input type="text" id="searchBox" class="search-box" placeholder="搜索书签标题或URL...">
+            <div class="menu-container">
+                <button id="menuButton" class="menu-button">⋮</button>
+                <div class="dropdown-menu" id="dropdownMenu">
+                    <button id="openBookmarkManager">打开书签管理器</button>
+                    <button id="generateSampleData">生成示例数据</button>
+                    <button id="exportCSV">导出 CSV</button>
+                    <button id="exportJSON">导出 JSON</button>
+                    <button id="resetSpecific">重置指定计数</button>
+                    <button id="cleanDeleted">清理已删除书签</button>
+                    <button id="clearAll">清空所有数据</button>
+                </div>
+            </div>
+        </div>
+        <div class="filter-container">
+            <span class="filter-label">分类:</span>
+            <div class="filter-chips" id="filterChips">
+                <!-- 动态生成分类筛选器 -->
+            </div>
+        </div>
+        <div class="date-filter">
+            <span class="date-filter-label">时间范围:</span>
+            <select id="dateRangeSelect" class="date-filter-select">
+                <option value="all">全部时间</option>
+                <option value="today">今天</option>
+                <option value="week">最近7天</option>
+                <option value="month">最近30天</option>
+                <option value="3months">最近3个月</option>
+                <option value="year">最近1年</option>
+            </select>
+        </div>
+        <div class="stats-header">
+            <div class="stats" id="statsPanel">
+                <div class="stats-row">
+                    <span>总书签数:</span>
+                    <span id="totalBookmarks">0</span>
+                </div>
+                <div class="stats-row">
+                    <span>总点击次数:</span>
+                    <span id="totalClicks">0</span>
+                </div>
+                <div class="stats-row">
+                    <span>平均点击次数:</span>
+                    <span id="avgClicks">0</span>
+                </div>
+                <div class="stats-row">
+                    <span>分类数:</span>
+                    <span id="totalFolders">0</span>
+                </div>
+                <div class="stats-row">
+                    <span>访问最多的分类:</span>
+                    <span id="topFolder">-</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="charts-section">
+        <div class="chart-container">
+            <div class="chart-title">分类点击分布</div>
+            <div class="chart-wrapper">
+                <canvas id="folderChart"></canvas>
+                <div id="folderChartEmpty" class="chart-empty" style="display: none;">暂无数据</div>
+            </div>
+        </div>
+        <div class="chart-container">
+            <div class="chart-title">最常用书签 Top 10</div>
+            <div class="chart-wrapper">
+                <canvas id="topBookmarksChart"></canvas>
+                <div id="topBookmarksChartEmpty" class="chart-empty" style="display: none;">暂无数据</div>
+            </div>
+        </div>
+    </div>
+    <div style="padding: 0 16px 16px;">
+        <div class="batch-actions" id="batchActions">
+            <div class="batch-info">
+                已选择 <span id="selectedCount">0</span> 项
+            </div>
+            <button class="batch-button danger" id="batchReset">批量重置</button>
+            <button class="batch-button" id="batchCancel">取消</button>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th class="checkbox-cell">
+                        <input type="checkbox" id="selectAll" title="全选">
+                    </th>
+                    <th class="sortable-header" data-sort="title">标题</th>
+                    <th>URL</th>
+                    <th class="sortable-header" data-sort="clicks">点击</th>
+                    <th class="sortable-header" data-sort="lastClick">最后访问</th>
+                </tr>
+            </thead>
+            <tbody id="bookmarkList">
+            </tbody>
+        </table>
+    </div>
+    <script src="chart.umd.min.js"></script>
     <script src="popup.js"></script>
 </body>
 
