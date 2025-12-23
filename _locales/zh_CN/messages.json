@@ -58,5 +58,9 @@
   "csvHeaderFirstAccess": { "message": "首次访问" },
   "csvHeaderLastAccess": { "message": "最后访问" },
   "exportNoData": { "message": "没有数据可导出" },
-  "chartDatasetClicks": { "message": "点击次数" }
+  "chartDatasetClicks": { "message": "点击次数" },
+  "timeDaysAgo": { "message": "$COUNT天前", "placeholders": { "COUNT": { "content": "$1" } } },
+  "timeHoursAgo": { "message": "$COUNT小时前", "placeholders": { "COUNT": { "content": "$1" } } },
+  "timeMinutesAgo": { "message": "$COUNT分钟前", "placeholders": { "COUNT": { "content": "$1" } } },
+  "timeJustNow": { "message": "刚刚" }
 }

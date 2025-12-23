@@ -326,7 +326,7 @@ function getAllBookmarks() {
 
 // 格式化时间
 function formatTime(timestamp) {
-    if (!timestamp) return "从未";
+    if (!timestamp) return t("never");
     const date = new Date(timestamp);
     const now = new Date();
     const diff = now - date;
@@ -336,15 +336,10 @@ function formatTime(timestamp) {
     const hours = Math.floor(minutes / 60);
     const days = Math.floor(hours / 24);
     
-    if (days > 0) {
-        return `${days}天前`;
-    } else if (hours > 0) {
-        return `${hours}小时前`;
-    } else if (minutes > 0) {
-        return `${minutes}分钟前`;
-    } else {
-        return "刚刚";
-    }
+    if (days > 0) return t("timeDaysAgo", [String(days)]);
+    if (hours > 0) return t("timeHoursAgo", [String(hours)]);
+    if (minutes > 0) return t("timeMinutesAgo", [String(minutes)]);
+    return t("timeJustNow");
 }
 
 // 加载并显示数据
@@ -853,8 +848,8 @@ function exportToCSV() {
         bookmark.title,
         bookmark.url,
         bookmark.clicks,
-        bookmark.firstClick ? new Date(bookmark.firstClick).toLocaleString() : t("never"),
-        bookmark.lastClick ? new Date(bookmark.lastClick).toLocaleString() : t("never")
+        bookmark.firstClick ? new Date(bookmark.firstClick).toISOString() : t("never"),
+        bookmark.lastClick ? new Date(bookmark.lastClick).toISOString() : t("never")
     ]);
     
     const csvContent = [
@@ -888,8 +883,8 @@ function exportToJSON() {
             clicks: bookmark.clicks,
             firstClick: bookmark.firstClick,
             lastClick: bookmark.lastClick,
-            firstClickFormatted: bookmark.firstClick ? new Date(bookmark.firstClick).toLocaleString("zh-CN") : null,
-            lastClickFormatted: bookmark.lastClick ? new Date(bookmark.lastClick).toLocaleString("zh-CN") : null
+            firstClickFormatted: bookmark.firstClick ? new Date(bookmark.firstClick).toISOString() : null,
+            lastClickFormatted: bookmark.lastClick ? new Date(bookmark.lastClick).toISOString() : null
         }))
     };
     
@@ -1177,7 +1172,11 @@ const defaultI18nZhCN = {
     csvHeaderFirstAccess: "首次访问",
     csvHeaderLastAccess: "最后访问",
     exportNoData: "没有数据可导出",
-    chartDatasetClicks: "点击次数"
+    chartDatasetClicks: "点击次数",
+    timeDaysAgo: "$COUNT天前",
+    timeHoursAgo: "$COUNT小时前",
+    timeMinutesAgo: "$COUNT分钟前",
+    timeJustNow: "刚刚"
 };
 
 // 英文默认文案
@@ -1239,7 +1238,11 @@ const defaultI18nEn = {
     csvHeaderFirstAccess: "First Access",
     csvHeaderLastAccess: "Last Access",
     exportNoData: "No data to export",
-    chartDatasetClicks: "Clicks"
+    chartDatasetClicks: "Clicks",
+    timeDaysAgo: "$COUNT days ago",
+    timeHoursAgo: "$COUNT hours ago",
+    timeMinutesAgo: "$COUNT minutes ago",
+    timeJustNow: "Just now"
 };
 // 初始化静态UI文案
 function initI18n() {
