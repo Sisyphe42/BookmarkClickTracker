@@ -1,5 +1,6 @@
 // 全局变量
 let allBookmarkData = [];
+let currentLangOverride = null; // 'zh_CN' | 'en' | null
 let currentSortField = "clicks"; // title, clicks, lastClick
 let currentSortOrder = "desc"; // asc, desc
 let currentSearchQuery = "";
@@ -8,7 +9,7 @@ let selectedBookmarks = new Set(); // 选中的书签URL
 let currentDateRange = "all"; // 日期范围筛选
 
 // 确保 DOM 已加载
-function init() {
+async function init() {
     const searchBox = document.getElementById("searchBox");
     const menuButton = document.getElementById("menuButton");
     const dropdownMenu = document.getElementById("dropdownMenu");
@@ -19,6 +20,11 @@ function init() {
     const resetSpecificBtn = document.getElementById("resetSpecific");
     const cleanDeletedBtn = document.getElementById("cleanDeleted");
     const clearAllBtn = document.getElementById("clearAll");
+    const languageMenuToggle = document.getElementById("languageMenuToggle");
+    const languageMenu = document.getElementById("languageMenu");
+
+    await initLanguage();
+    initI18n();
 
     // 表头排序
     document.querySelectorAll(".sortable-header").forEach(header => {
@@ -67,6 +73,7 @@ function init() {
         if (!menuContainer.contains(e.target)) {
             dropdownMenu.classList.remove("show");
         }
+        if (languageMenu) languageMenu.classList.remove("show");
         // 关闭所有操作菜单
         document.querySelectorAll(".action-dropdown").forEach(menu => {
             if (!menu.contains(e.target) && !e.target.closest(".action-button")) {
@@ -80,11 +87,36 @@ function init() {
         chrome.tabs.create({ url: "chrome://bookmarks/" });
         dropdownMenu.classList.remove("show");
     });
+    
+    // 语言按钮与菜单
+    if (languageMenuToggle && languageMenu) {
+        languageMenuToggle.addEventListener("click", (e) => {
+            e.stopPropagation();
+            languageMenu.classList.toggle("show");
+        });
+        languageMenu.querySelectorAll("button").forEach(btn => {
+            btn.addEventListener("click", async () => {
+                const lang = btn.getAttribute("data-lang");
+                if (lang === "default") {
+                    currentLangOverride = null;
+                    chrome.storage.local.remove("langOverride", () => {});
+                } else {
+                    currentLangOverride = lang;
+                    chrome.storage.local.set({ langOverride: lang }, () => {});
+                }
+                await initLanguage();
+                initI18n();
+                updateSortHeaders();
+                displayBookmarkList();
+                languageMenu.classList.remove("show");
+            });
+        });
+    }
 
     // 生成示例数据
     generateSampleDataBtn.addEventListener("click", () => {
         dropdownMenu.classList.remove("show");
-        if (confirm("生成示例数据将覆盖现有数据，是否继续？")) {
+        if (confirm(t("confirmGenerateSampleData"))) {
             generateSampleData();
         }
     });
@@ -104,21 +136,21 @@ function init() {
     // 重置指定计数
     resetSpecificBtn.addEventListener("click", () => {
         dropdownMenu.classList.remove("show");
-        const url = prompt("请输入要重置的书签URL（必须与原始URL完全一致）:");
+        const url = prompt(t("promptResetSpecific"));
         if (url && url.trim()) {
             const trimmedUrl = url.trim();
             chrome.storage.local.get("clickCounts", (data) => {
                 const clickCounts = data.clickCounts || {};
                 if (clickCounts[trimmedUrl]) {
-                    if (confirm(`确定要重置该URL的点击次数吗？\n${trimmedUrl}`)) {
+                    if (confirm(t("confirmResetSpecific", [trimmedUrl]))){
                         delete clickCounts[trimmedUrl];
                         chrome.storage.local.set({ clickCounts }, () => {
                             loadAndDisplayData();
-                            alert("重置成功");
+                            alert(t("resetSuccess"));
                         });
                     }
                 } else {
-                    alert("未找到匹配的URL，请确认URL是否完全一致");
+                    alert(t("notFoundExactURL"));
                 }
             });
         }
@@ -132,7 +164,7 @@ function init() {
 
     // 清空所有数据
     clearAllBtn.addEventListener("click", () => {
-        if (confirm("确定要清空所有统计数据吗？此操作不可恢复！")) {
+        if (confirm(t("confirmClearAll"))) {
             clearAllData();
             dropdownMenu.classList.remove("show");
         }
@@ -161,7 +193,7 @@ function init() {
 
     batchResetBtn.addEventListener("click", () => {
         if (selectedBookmarks.size === 0) return;
-        if (confirm(`确定要重置选中的 ${selectedBookmarks.size} 个书签的点击次数吗？`)) {
+        if (confirm(t("confirmBatchReset", [String(selectedBookmarks.size)]))) {
             batchResetSelected();
         }
     });
@@ -207,6 +239,11 @@ function updateBatchActions() {
     
     const count = selectedBookmarks.size;
     selectedCount.textContent = count;
+    const batchInfo = document.querySelector(".batch-info");
+    if (batchInfo) {
+        // 重置文本为“已选择 {count} 项”
+        batchInfo.innerHTML = `${t("batchSelectedLabel")} <span id="selectedCount">${count}</span> ${t("batchItemsSuffix")}`;
+    }
     if (count > 0) {
         batchActions.classList.add("show");
     } else {
@@ -313,7 +350,7 @@ function formatTime(timestamp) {
 // 加载并显示数据
 async function loadAndDisplayData() {
     const bookmarkList = document.getElementById("bookmarkList");
-    bookmarkList.innerHTML = "<tr><td colspan='5' style='text-align: center; padding: 20px;'>加载中...</td></tr>";
+    bookmarkList.innerHTML = `<tr><td colspan='5' style='text-align: center; padding: 20px;'>${t("loading")}</td></tr>`;
     
     // 使用 local storage
     chrome.storage.local.get("clickCounts", async (data) => {
@@ -359,7 +396,7 @@ async function loadAndDisplayData() {
             updateFilterChips();
         } catch (error) {
             console.error('加载数据时出错:', error);
-            bookmarkList.innerHTML = "<tr><td colspan='5' style='text-align: center; padding: 20px; color: #d32f2f;'>加载数据时出错，请刷新重试</td></tr>";
+            bookmarkList.innerHTML = `<tr><td colspan='5' style='text-align: center; padding: 20px; color: #d32f2f;'>${t("errorLoadData")}</td></tr>`;
         }
     });
 }
@@ -397,7 +434,7 @@ function updateFilterChips() {
     // 添加"全部"选项
     const allChip = document.createElement("div");
     allChip.classList.add("filter-chip", "clear-all");
-    allChip.textContent = "全部";
+    allChip.textContent = t("filterAll");
     if (selectedFolders.size === 0) {
         allChip.classList.add("active");
     }
@@ -518,7 +555,7 @@ function displayBookmarkList() {
     
     if (sortedData.length === 0) {
         bookmarkList.innerHTML = "<tr><td colspan='5' style='text-align: center; padding: 20px;'>" + 
-            (currentSearchQuery ? "未找到匹配的书签" : "暂无书签点击数据") + "</td></tr>";
+            (currentSearchQuery ? t("emptyNoMatch") : t("emptyNoData")) + "</td></tr>";
         return;
     }
     
@@ -548,7 +585,7 @@ function displayBookmarkList() {
 
         const titleCell = document.createElement("td");
         if (bookmark.deleted) {
-            titleCell.innerHTML = `<span style="color: rgba(0, 0, 0, 0.38); text-decoration: line-through;">${bookmark.title}</span>`;
+            titleCell.innerHTML = `<span style="color: rgba(0, 0, 0, 0.38); text-decoration: line-through;">${t("deletedBookmarkTitle")}</span>`;
             row.style.opacity = "0.6";
         } else {
             titleCell.textContent = bookmark.title;
@@ -583,12 +620,12 @@ function displayBookmarkList() {
         // 工具提示显示完整时间信息
         const tooltip = document.createElement("span");
         tooltip.classList.add("tooltiptext");
-        let tooltipText = `最后访问: ${bookmark.lastClick ? new Date(bookmark.lastClick).toLocaleString("zh-CN") : "从未"}`;
+        let tooltipText = `${t("lastAccessPrefix")} ${bookmark.lastClick ? new Date(bookmark.lastClick).toLocaleString() : t("never")}`;
         if (bookmark.firstClick) {
-            tooltipText += `\n首次访问: ${new Date(bookmark.firstClick).toLocaleString("zh-CN")}`;
+            tooltipText += `\n${t("firstAccessPrefix")} ${new Date(bookmark.firstClick).toLocaleString()}`;
         }
         if (bookmark.folder) {
-            tooltipText += `\n分类: ${bookmark.folder}`;
+            tooltipText += `\n${t("folderPrefix")} ${bookmark.folder}`;
         }
         tooltip.textContent = tooltipText;
         tooltip.style.whiteSpace = "pre-line";
@@ -731,7 +768,7 @@ function updateCharts(data) {
             data: {
                 labels: bookmarkLabels,
                 datasets: [{
-                    label: '点击次数',
+                    label: t("chartDatasetClicks"),
                     data: bookmarkData,
                     backgroundColor: '#1976d2'
                 }]
@@ -807,17 +844,17 @@ function updateStats(data) {
 // 导出CSV
 function exportToCSV() {
     if (allBookmarkData.length === 0) {
-        alert("没有数据可导出");
+        alert(t("exportNoData"));
         return;
     }
     
-    const headers = ["标题", "URL", "点击次数", "首次访问", "最后访问"];
+    const headers = [t("csvHeaderTitle"), t("csvHeaderURL"), t("csvHeaderClicks"), t("csvHeaderFirstAccess"), t("csvHeaderLastAccess")];
     const rows = allBookmarkData.map(bookmark => [
         bookmark.title,
         bookmark.url,
         bookmark.clicks,
-        bookmark.firstClick ? new Date(bookmark.firstClick).toLocaleString("zh-CN") : "从未",
-        bookmark.lastClick ? new Date(bookmark.lastClick).toLocaleString("zh-CN") : "从未"
+        bookmark.firstClick ? new Date(bookmark.firstClick).toLocaleString() : t("never"),
+        bookmark.lastClick ? new Date(bookmark.lastClick).toLocaleString() : t("never")
     ]);
     
     const csvContent = [
@@ -837,7 +874,7 @@ function exportToCSV() {
 // 导出JSON
 function exportToJSON() {
     if (allBookmarkData.length === 0) {
-        alert("没有数据可导出");
+        alert(t("exportNoData"));
         return;
     }
     
@@ -887,14 +924,14 @@ function cleanDeletedBookmarks() {
         });
         
         if (deletedCount === 0) {
-            alert("没有发现已删除的书签");
+            alert(t("emptyNoData"));
             return;
         }
         
-        if (confirm(`发现 ${deletedCount} 个已删除书签的数据，是否清理？`)) {
+        if (confirm(t("confirmBatchReset", [String(deletedCount)]))) {
             chrome.storage.local.set({ clickCounts: cleanedCounts }, () => {
                 loadAndDisplayData();
-                alert(`已清理 ${deletedCount} 个已删除书签的数据`);
+                alert(t("batchResetSuccess", [String(deletedCount)]));
             });
         }
     });
@@ -1049,6 +1086,259 @@ function clearAllData() {
     chrome.storage.local.set({ clickCounts: {} }, () => {
         allBookmarkData = [];
         displayBookmarkList();
-        alert("所有数据已清空");
+        alert(t("menuClearAll"));
     });
+}
+
+// 语言工具
+function t(key, substitutions) {
+    try {
+        if (currentLangOverride === "en") {
+            const msg = defaultI18nEn[key];
+            if (msg) return substitute(msg, substitutions);
+        } else if (currentLangOverride === "zh_CN") {
+            const msg = defaultI18nZhCN[key];
+            if (msg) return substitute(msg, substitutions);
+        } else if (chrome && chrome.i18n && typeof chrome.i18n.getMessage === "function") {
+            const msg = chrome.i18n.getMessage(key, substitutions);
+            if (msg) return msg;
+        }
+    } catch (_) {}
+    const fallback = defaultI18nZhCN[key];
+    if (fallback) return substitute(fallback, substitutions);
+    return key;
+}
+
+function substitute(str, substitutions) {
+    if (Array.isArray(substitutions) && substitutions.length) {
+        let s = String(str);
+        s = s.replace("$COUNT", substitutions[0]).replace("$URL", substitutions[0]);
+        return s;
+    }
+    return str;
+}
+
+// 最小中文默认文案（预览模式无 i18n 时使用）
+const defaultI18nZhCN = {
+    searchPlaceholder: "搜索书签标题或URL...",
+    language: "语言",
+    langDefault: "默认",
+    menuOpenBookmarkManager: "打开书签管理器",
+    menuGenerateSampleData: "生成示例数据",
+    menuExportCSV: "导出 CSV",
+    menuExportJSON: "导出 JSON",
+    menuResetSpecific: "重置指定计数",
+    menuCleanDeleted: "清理已删除书签",
+    menuClearAll: "清空所有数据",
+    filterLabel: "分类:",
+    dateRangeLabel: "时间范围:",
+    dateAll: "全部时间",
+    dateToday: "今天",
+    dateWeek: "最近7天",
+    dateMonth: "最近30天",
+    date3months: "最近3个月",
+    dateYear: "最近1年",
+    statsTotalBookmarks: "总书签数:",
+    statsTotalClicks: "总点击次数:",
+    statsAvgClicks: "平均点击次数:",
+    statsTotalFolders: "分类数:",
+    statsTopFolder: "访问最多的分类:",
+    chartFolderDistribution: "分类点击分布",
+    chartTopBookmarks: "最常用书签 Top 10",
+    tableTitle: "标题",
+    tableURL: "URL",
+    tableClicks: "点击",
+    tableLastClick: "最后访问",
+    emptyNoData: "暂无书签点击数据",
+    emptyNoMatch: "未找到匹配的书签",
+    loading: "加载中...",
+    deletedBookmarkTitle: "已删除的书签",
+    batchReset: "批量重置",
+    batchCancel: "取消",
+    batchSelectedLabel: "已选择",
+    batchItemsSuffix: "项",
+    filterAll: "全部",
+    confirmGenerateSampleData: "生成示例数据将覆盖现有数据，是否继续？",
+    promptResetSpecific: "请输入要重置的书签URL（必须与原始URL完全一致）:",
+    confirmResetSpecific: "确定要重置该URL的点击次数吗？\n$URL",
+    resetSuccess: "重置成功",
+    notFoundExactURL: "未找到匹配的URL，请确认URL是否完全一致",
+    confirmClearAll: "确定要清空所有统计数据吗？此操作不可恢复！",
+    confirmBatchReset: "确定要重置选中的 $COUNT 个书签的点击次数吗？",
+    batchResetSuccess: "已重置 $COUNT 个书签的点击次数",
+    errorLoadData: "加载数据时出错，请刷新重试",
+    never: "从未",
+    lastAccessPrefix: "最后访问:",
+    firstAccessPrefix: "首次访问:",
+    folderPrefix: "分类:",
+    csvHeaderTitle: "标题",
+    csvHeaderURL: "URL",
+    csvHeaderClicks: "点击次数",
+    csvHeaderFirstAccess: "首次访问",
+    csvHeaderLastAccess: "最后访问",
+    exportNoData: "没有数据可导出",
+    chartDatasetClicks: "点击次数"
+};
+
+// 英文默认文案
+const defaultI18nEn = {
+    searchPlaceholder: "Search bookmarks by title or URL...",
+    language: "Language",
+    langDefault: "Default",
+    menuOpenBookmarkManager: "Open Bookmark Manager",
+    menuGenerateSampleData: "Generate Sample Data",
+    menuExportCSV: "Export CSV",
+    menuExportJSON: "Export JSON",
+    menuResetSpecific: "Reset Specific Count",
+    menuCleanDeleted: "Clean Deleted Bookmarks",
+    menuClearAll: "Clear All Data",
+    filterLabel: "Category:",
+    dateRangeLabel: "Date Range:",
+    dateAll: "All Time",
+    dateToday: "Today",
+    dateWeek: "Last 7 Days",
+    dateMonth: "Last 30 Days",
+    date3months: "Last 3 Months",
+    dateYear: "Last 1 Year",
+    statsTotalBookmarks: "Total Bookmarks:",
+    statsTotalClicks: "Total Clicks:",
+    statsAvgClicks: "Average Clicks:",
+    statsTotalFolders: "Folders:",
+    statsTopFolder: "Top Folder:",
+    chartFolderDistribution: "Folder Click Distribution",
+    chartTopBookmarks: "Top 10 Bookmarks",
+    tableTitle: "Title",
+    tableURL: "URL",
+    tableClicks: "Clicks",
+    tableLastClick: "Last Access",
+    emptyNoData: "No bookmark click data",
+    emptyNoMatch: "No matching bookmarks",
+    loading: "Loading...",
+    deletedBookmarkTitle: "Deleted Bookmark",
+    batchReset: "Batch Reset",
+    batchCancel: "Cancel",
+    batchSelectedLabel: "Selected",
+    batchItemsSuffix: "items",
+    filterAll: "All",
+    confirmGenerateSampleData: "Generating sample data will overwrite existing data. Continue?",
+    promptResetSpecific: "Enter the bookmark URL to reset (must match exactly):",
+    confirmResetSpecific: "Are you sure to reset the click count for this URL?\n$URL",
+    resetSuccess: "Reset successful",
+    notFoundExactURL: "No matching URL found. Please check the exact URL.",
+    confirmClearAll: "Clear all statistics? This action cannot be undone!",
+    confirmBatchReset: "Reset click counts for selected $COUNT bookmarks?",
+    batchResetSuccess: "Reset $COUNT bookmarks",
+    errorLoadData: "Error loading data, please refresh and try again",
+    never: "Never",
+    lastAccessPrefix: "Last Access:",
+    firstAccessPrefix: "First Access:",
+    folderPrefix: "Folder:",
+    csvHeaderTitle: "Title",
+    csvHeaderURL: "URL",
+    csvHeaderClicks: "Clicks",
+    csvHeaderFirstAccess: "First Access",
+    csvHeaderLastAccess: "Last Access",
+    exportNoData: "No data to export",
+    chartDatasetClicks: "Clicks"
+};
+// 初始化静态UI文案
+function initI18n() {
+    const searchBox = document.getElementById("searchBox");
+    if (searchBox) searchBox.placeholder = t("searchPlaceholder");
+
+    const ids = {
+        openBookmarkManager: "menuOpenBookmarkManager",
+        generateSampleData: "menuGenerateSampleData",
+        exportCSV: "menuExportCSV",
+        exportJSON: "menuExportJSON",
+        resetSpecific: "menuResetSpecific",
+        cleanDeleted: "menuCleanDeleted",
+        clearAll: "menuClearAll",
+        batchReset: "batchReset",
+        batchCancel: "batchCancel"
+    };
+    Object.entries(ids).forEach(([id, key]) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = t(key);
+    });
+    const languageToggle = document.getElementById("languageMenuToggle");
+    if (languageToggle) languageToggle.textContent = `🌐 ${t("language")}`;
+    const langMenu = document.getElementById("languageMenu");
+    if (langMenu) {
+        const defaultBtn = langMenu.querySelector('button[data-lang="default"]');
+        if (defaultBtn) defaultBtn.textContent = t("langDefault");
+        const zhBtn = langMenu.querySelector('button[data-lang="zh_CN"]');
+        if (zhBtn) zhBtn.textContent = "中文";
+        const enBtn = langMenu.querySelector('button[data-lang="en"]');
+        if (enBtn) enBtn.textContent = "English";
+    }
+
+    const filterLabel = document.querySelector(".filter-label");
+    if (filterLabel) filterLabel.textContent = t("filterLabel");
+    const dateLabel = document.querySelector(".date-filter-label");
+    if (dateLabel) dateLabel.textContent = t("dateRangeLabel");
+
+    const dateSelect = document.getElementById("dateRangeSelect");
+    if (dateSelect) {
+        const optionsMap = {
+            all: "dateAll",
+            today: "dateToday",
+            week: "dateWeek",
+            month: "dateMonth",
+            "3months": "date3months",
+            year: "dateYear"
+        };
+        Array.from(dateSelect.options).forEach(opt => {
+            const key = optionsMap[opt.value];
+            if (key) opt.textContent = t(key);
+        });
+    }
+
+    const rows = document.querySelectorAll(".stats-row");
+    const statKeys = ["statsTotalBookmarks", "statsTotalClicks", "statsAvgClicks", "statsTotalFolders", "statsTopFolder"];
+    rows.forEach((row, idx) => {
+        const labelSpan = row.querySelector("span:first-child");
+        if (labelSpan && statKeys[idx]) labelSpan.textContent = t(statKeys[idx]);
+    });
+
+    const chartTitles = document.querySelectorAll(".chart-title");
+    if (chartTitles[0]) chartTitles[0].textContent = t("chartFolderDistribution");
+    if (chartTitles[1]) chartTitles[1].textContent = t("chartTopBookmarks");
+
+    const folderEmpty = document.getElementById("folderChartEmpty");
+    const topEmpty = document.getElementById("topBookmarksChartEmpty");
+    if (folderEmpty) folderEmpty.textContent = t("emptyNoData");
+    if (topEmpty) topEmpty.textContent = t("emptyNoData");
+
+    const thTitle = document.querySelector('th[data-sort="title"]');
+    const thClicks = document.querySelector('th[data-sort="clicks"]');
+    const thLast = document.querySelector('th[data-sort="lastClick"]');
+    const thUrl = document.querySelector('table thead th:nth-child(3)');
+    if (thTitle) thTitle.textContent = t("tableTitle");
+    if (thUrl) thUrl.textContent = t("tableURL");
+    if (thClicks) thClicks.textContent = t("tableClicks");
+    if (thLast) thLast.textContent = t("tableLastClick");
+}
+
+async function initLanguage() {
+    try {
+        await new Promise(resolve => {
+            chrome.storage.local.get("langOverride", (data) => {
+                currentLangOverride = data.langOverride || null;
+                resolve();
+            });
+        });
+    } catch (_) {
+        currentLangOverride = null;
+    }
+    let docLang = "zh-CN";
+    if (currentLangOverride === "en") docLang = "en";
+    else if (currentLangOverride === "zh_CN") docLang = "zh-CN";
+    else {
+        try {
+            const uiLang = chrome.i18n.getUILanguage();
+            docLang = uiLang || docLang;
+        } catch (_) {}
+    }
+    document.documentElement.lang = docLang;
 }

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 
 <head>
     <meta charset="UTF-8">
@@ -27,7 +27,8 @@
             flex: 1;
             overflow-y: auto;
             overflow-x: hidden;
-            padding-bottom: 60px; /* Space for batch actions */
+            padding-bottom: 60px;
+            /* Space for batch actions */
         }
 
         .header {
@@ -43,7 +44,7 @@
             background-color: #fafafa;
             padding: 10px;
             border-bottom: 1px solid #d9d9d9;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
             display: flex;
             align-items: center;
             gap: 8px;
@@ -317,7 +318,8 @@
             table-layout: fixed;
         }
 
-        th, td {
+        th,
+        td {
             padding: 12px 16px;
             text-align: left;
             border-bottom: 1px solid rgba(0, 0, 0, 0.12);
@@ -386,7 +388,8 @@
 
         .tooltip .tooltiptext {
             visibility: hidden;
-            width: 200px;
+            display: inline-block;
+            width: max-content;
             background-color: #424242;
             color: #fff;
             text-align: left;
@@ -395,14 +398,16 @@
             position: absolute;
             z-index: 1000;
             bottom: 125%;
-            left: 50%;
-            margin-left: -100px;
+            right: -20px;
+            left: auto;
             opacity: 0;
             transition: opacity 0.2s ease, transform 0.2s ease;
             transform: translateY(-4px);
             font-size: 12px;
             line-height: 1.4;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            max-width: calc(100vw - 24px);
+            overflow-wrap: anywhere;
         }
 
         .tooltip:hover .tooltiptext {
@@ -439,6 +444,7 @@
                 opacity: 0;
                 transform: translateY(-8px);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0);
@@ -472,6 +478,34 @@
 
         .dropdown-menu button:active {
             background-color: rgba(0, 0, 0, 0.08);
+        }
+        
+        .dropdown-submenu {
+            display: none;
+            border-top: 1px solid rgba(0, 0, 0, 0.06);
+        }
+        .dropdown-submenu.show {
+            display: block;
+            animation: fadeIn 0.2s ease;
+        }
+        .dropdown-submenu button {
+            width: 100%;
+            text-align: left;
+            border: none;
+            border-radius: 0;
+            padding: 10px 16px;
+            background: #fff;
+            min-width: auto;
+            flex: none;
+            font-size: 13px;
+            color: rgba(0, 0, 0, 0.87);
+            text-transform: none;
+            letter-spacing: normal;
+            font-weight: 400;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+        }
+        .dropdown-submenu button:last-child {
+            border-bottom: none;
         }
 
         .action-menu {
@@ -613,6 +647,12 @@
                 <button id="resetSpecific">重置指定计数</button>
                 <button id="cleanDeleted">清理已删除书签</button>
                 <button id="clearAll">清空所有数据</button>
+                <button id="languageMenuToggle">🌐 语言</button>
+                <div class="dropdown-submenu" id="languageMenu">
+                    <button data-lang="default">默认</button>
+                    <button data-lang="zh_CN">中文</button>
+                    <button data-lang="en">English</button>
+                </div>
             </div>
         </div>
     </div>
@@ -626,80 +666,80 @@
     <div class="main-content">
         <div class="header">
             <div class="filter-container">
-            <span class="filter-label">分类:</span>
-            <div class="filter-chips" id="filterChips">
-                <!-- 动态生成分类筛选器 -->
-            </div>
-        </div>
-        <div class="date-filter">
-            <span class="date-filter-label">时间范围:</span>
-            <select id="dateRangeSelect" class="date-filter-select">
-                <option value="all">全部时间</option>
-                <option value="today">今天</option>
-                <option value="week">最近7天</option>
-                <option value="month">最近30天</option>
-                <option value="3months">最近3个月</option>
-                <option value="year">最近1年</option>
-            </select>
-        </div>
-        <div class="stats-header">
-            <div class="stats" id="statsPanel">
-                <div class="stats-row">
-                    <span>总书签数:</span>
-                    <span id="totalBookmarks">0</span>
-                </div>
-                <div class="stats-row">
-                    <span>总点击次数:</span>
-                    <span id="totalClicks">0</span>
-                </div>
-                <div class="stats-row">
-                    <span>平均点击次数:</span>
-                    <span id="avgClicks">0</span>
-                </div>
-                <div class="stats-row">
-                    <span>分类数:</span>
-                    <span id="totalFolders">0</span>
-                </div>
-                <div class="stats-row">
-                    <span>访问最多的分类:</span>
-                    <span id="topFolder">-</span>
+                <span class="filter-label">分类:</span>
+                <div class="filter-chips" id="filterChips">
+                    <!-- 动态生成分类筛选器 -->
                 </div>
             </div>
-        </div>
-    </div>
-    <div class="charts-section">
-        <div class="chart-container">
-            <div class="chart-title">分类点击分布</div>
-            <div class="chart-wrapper">
-                <canvas id="folderChart"></canvas>
-                <div id="folderChartEmpty" class="chart-empty" style="display: none;">暂无数据</div>
+            <div class="date-filter">
+                <span class="date-filter-label">时间范围:</span>
+                <select id="dateRangeSelect" class="date-filter-select">
+                    <option value="all">全部时间</option>
+                    <option value="today">今天</option>
+                    <option value="week">最近7天</option>
+                    <option value="month">最近30天</option>
+                    <option value="3months">最近3个月</option>
+                    <option value="year">最近1年</option>
+                </select>
+            </div>
+            <div class="stats-header">
+                <div class="stats" id="statsPanel">
+                    <div class="stats-row">
+                        <span>总书签数:</span>
+                        <span id="totalBookmarks">0</span>
+                    </div>
+                    <div class="stats-row">
+                        <span>总点击次数:</span>
+                        <span id="totalClicks">0</span>
+                    </div>
+                    <div class="stats-row">
+                        <span>平均点击次数:</span>
+                        <span id="avgClicks">0</span>
+                    </div>
+                    <div class="stats-row">
+                        <span>分类数:</span>
+                        <span id="totalFolders">0</span>
+                    </div>
+                    <div class="stats-row">
+                        <span>访问最多的分类:</span>
+                        <span id="topFolder">-</span>
+                    </div>
+                </div>
             </div>
         </div>
-        <div class="chart-container">
-            <div class="chart-title">最常用书签 Top 10</div>
-            <div class="chart-wrapper">
-                <canvas id="topBookmarksChart"></canvas>
-                <div id="topBookmarksChartEmpty" class="chart-empty" style="display: none;">暂无数据</div>
+        <div class="charts-section">
+            <div class="chart-container">
+                <div class="chart-title">分类点击分布</div>
+                <div class="chart-wrapper">
+                    <canvas id="folderChart"></canvas>
+                    <div id="folderChartEmpty" class="chart-empty" style="display: none;">暂无数据</div>
+                </div>
+            </div>
+            <div class="chart-container">
+                <div class="chart-title">最常用书签 Top 10</div>
+                <div class="chart-wrapper">
+                    <canvas id="topBookmarksChart"></canvas>
+                    <div id="topBookmarksChartEmpty" class="chart-empty" style="display: none;">暂无数据</div>
+                </div>
             </div>
         </div>
-    </div>
-    <div style="padding: 0 16px 16px;">
-        <table>
-            <thead>
-                <tr>
-                    <th class="checkbox-cell" style="width: 40px;">
-                        <input type="checkbox" id="selectAll" title="全选">
-                    </th>
-                    <th class="sortable-header" data-sort="title">标题</th>
-                    <th>URL</th>
-                    <th class="sortable-header" data-sort="clicks">点击</th>
-                    <th class="sortable-header" data-sort="lastClick">最后访问</th>
-                </tr>
-            </thead>
-            <tbody id="bookmarkList">
-            </tbody>
-        </table>
-    </div>
+        <div style="padding: 0 16px 16px;">
+            <table>
+                <thead>
+                    <tr>
+                        <th class="checkbox-cell" style="width: 40px;">
+                            <input type="checkbox" id="selectAll" title="全选">
+                        </th>
+                        <th class="sortable-header" data-sort="title">标题</th>
+                        <th>URL</th>
+                        <th class="sortable-header" data-sort="clicks">点击</th>
+                        <th class="sortable-header" data-sort="lastClick">最后访问</th>
+                    </tr>
+                </thead>
+                <tbody id="bookmarkList">
+                </tbody>
+            </table>
+        </div>
     </div>
     <script src="chart.umd.min.js"></script>
     <script src="popup.js"></script>
