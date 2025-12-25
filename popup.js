@@ -22,6 +22,9 @@ async function init() {
     const clearAllBtn = document.getElementById("clearAll");
     const languageMenuToggle = document.getElementById("languageMenuToggle");
     const languageMenu = document.getElementById("languageMenu");
+    const folderWrapper = document.getElementById("folderWrapper");
+    const folderToggle = document.getElementById("folderToggle");
+    const folderToggleIcon = document.getElementById("folderToggleIcon");
 
     await initLanguage();
     initI18n();
@@ -67,6 +70,14 @@ async function init() {
         e.stopPropagation();
         dropdownMenu.classList.toggle("show");
     });
+
+    // 分类展开/折叠
+    if (folderWrapper && folderToggle && folderToggleIcon) {
+        folderToggle.addEventListener("click", () => {
+            const expanded = folderWrapper.classList.toggle("expanded");
+            folderToggleIcon.src = expanded ? "assets/fold.svg" : "assets/expand.svg";
+        });
+    }
 
     // 点击外部关闭菜单
     document.addEventListener("click", (e) => {
@@ -276,49 +287,43 @@ function getAllBookmarks() {
     return new Promise((resolve) => {
         chrome.bookmarks.getTree((bookmarkTreeNodes) => {
             const urlMap = new Map();
-            const folderMap = new Map(); // 存储文件夹ID到文件夹名称的映射
             
-            // 首先构建文件夹映射
-            function buildFolderMap(nodes, parentFolder = null) {
-                nodes.forEach((node) => {
-                    if (!node.url) {
-                        // 这是一个文件夹
-                        folderMap.set(node.id, {
-                            name: node.title,
-                            parent: parentFolder
-                        });
-                        if (node.children) {
-                            buildFolderMap(node.children, node.title);
-                        }
-                    } else if (node.children) {
-                        // 有子节点的节点
-                        buildFolderMap(node.children, parentFolder);
-                    }
-                });
+            function isRootContainer(title) {
+                return [
+                    "书签栏",
+                    "其他书签",
+                    "移动书签",
+                    "Bookmarks Bar",
+                    "Bookmarks bar",
+                    "Other Bookmarks",
+                    "Mobile Bookmarks"
+                ].includes(title);
             }
             
-            // 构建书签映射，同时记录一级分类
-            function traverse(nodes, currentFolder = null) {
+            function traverse(nodes, currentTopLevel = null, inRoot = false) {
                 nodes.forEach((node) => {
                     if (node.url) {
-                        // 这是一个书签
                         urlMap.set(node.url, {
                             title: node.title,
                             id: node.id,
-                            folder: currentFolder || "其他"
+                            folder: currentTopLevel || "其他"
                         });
                     } else {
-                        // 这是一个文件夹
-                        const folderName = node.title;
+                        const title = node.title;
+                        const isRoot = isRootContainer(title);
                         if (node.children) {
-                            traverse(node.children, folderName);
+                            if (isRoot) {
+                                traverse(node.children, null, true);
+                            } else {
+                                const nextTopLevel = currentTopLevel || (inRoot ? title : currentTopLevel || title);
+                                traverse(node.children, nextTopLevel, false);
+                            }
                         }
                     }
                 });
             }
             
-            buildFolderMap(bookmarkTreeNodes);
-            traverse(bookmarkTreeNodes);
+            traverse(bookmarkTreeNodes, null, false);
             resolve(urlMap);
         });
     });
@@ -463,6 +468,22 @@ function updateFilterChips() {
         
         filterChips.appendChild(chip);
     });
+
+    // 动态计算行高与最大高度，确保完全显示第二行并浅浅露出第三行
+    const folderWrapper = document.getElementById("folderWrapper");
+    if (folderWrapper) {
+        const firstChip = filterChips.querySelector(".filter-chip");
+        const chipHeight = firstChip ? Math.round(firstChip.getBoundingClientRect().height) : 28;
+        let gap = 6;
+        try {
+            const gapStr = getComputedStyle(filterChips).gap;
+            const num = parseFloat(gapStr);
+            if (!isNaN(num)) gap = num;
+        } catch (_) {}
+        folderWrapper.style.setProperty("--chip-line-height", `${chipHeight}px`);
+        folderWrapper.style.setProperty("--chips-row-gap", `${gap}px`);
+        folderWrapper.style.setProperty("--peek", `8px`);
+    }
 }
 
 // 显示书签列表
@@ -1191,7 +1212,7 @@ const defaultI18nEn = {
     menuResetSpecific: "Reset Specific Count",
     menuCleanDeleted: "Clean Deleted Bookmarks",
     menuClearAll: "Clear All Data",
-    filterLabel: "Category:",
+    filterLabel: "Folder:",
     dateRangeLabel: "Date Range:",
     dateAll: "All Time",
     dateToday: "Today",

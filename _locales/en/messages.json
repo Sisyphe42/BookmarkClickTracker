@@ -11,7 +11,7 @@
   "menuResetSpecific": { "message": "Reset Specific Count" },
   "menuCleanDeleted": { "message": "Clean Deleted Bookmarks" },
   "menuClearAll": { "message": "Clear All Data" },
-  "filterLabel": { "message": "Category:" },
+  "filterLabel": { "message": "Folder:" },
   "dateRangeLabel": { "message": "Date Range:" },
   "dateAll": { "message": "All Time" },
   "dateToday": { "message": "Today" },
