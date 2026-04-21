@@ -4,13 +4,16 @@ let currentLangOverride = null; // 'zh_CN' | 'en' | null
 let currentSortField = "clicks"; // title, clicks, lastClick
 let currentSortOrder = "desc"; // asc, desc
 let currentSearchQuery = "";
+let currentSearchMode = "bookmark"; // "bookmark" | "category"
 let selectedFolders = new Set(); // 选中的分类
 let selectedBookmarks = new Set(); // 选中的书签URL
 let currentDateRange = "all"; // 日期范围筛选
+let allCategoryPaths = new Set(); // 所有分类路径
 
 // 确保 DOM 已加载
 async function init() {
     const searchBox = document.getElementById("searchBox");
+    const modeToggle = document.getElementById("modeToggle");
     const menuButton = document.getElementById("menuButton");
     const dropdownMenu = document.getElementById("dropdownMenu");
     const openBookmarkManagerBtn = document.getElementById("openBookmarkManager");
@@ -28,6 +31,17 @@ async function init() {
 
     await initLanguage();
     initI18n();
+
+    // 模式切换按钮
+    if (modeToggle) {
+        modeToggle.addEventListener("click", () => {
+            currentSearchMode = currentSearchMode === "bookmark" ? "category" : "bookmark";
+            updateModeToggleUI();
+            currentSearchQuery = "";
+            searchBox.value = "";
+            displayBookmarkList();
+        });
+    }
 
     // 表头排序
     document.querySelectorAll(".sortable-header").forEach(header => {
@@ -167,6 +181,13 @@ async function init() {
         }
     });
 
+    // 合并书签
+    const mergeBookmarksBtn = document.getElementById("mergeBookmarks");
+    mergeBookmarksBtn.addEventListener("click", () => {
+        dropdownMenu.classList.remove("show");
+        mergeBookmarks();
+    });
+
     // 清理已删除书签
     cleanDeletedBtn.addEventListener("click", () => {
         dropdownMenu.classList.remove("show");
@@ -282,11 +303,63 @@ function updateSortHeaders() {
     });
 }
 
-// 性能优化：批量获取所有书签，建立URL映射，并获取一级分类信息
+// 更新模式切换UI
+function updateModeToggleUI() {
+    const modeToggle = document.getElementById("modeToggle");
+    const searchBox = document.getElementById("searchBox");
+    
+    if (modeToggle) {
+        modeToggle.textContent = currentSearchMode === "bookmark" ? t("modeBookmark") : t("modeCategory");
+        modeToggle.classList.toggle("active", currentSearchMode === "category");
+    }
+    
+    if (searchBox) {
+        if (currentSearchMode === "bookmark") {
+            searchBox.placeholder = t("searchPlaceholder");
+        } else {
+            // 生成分类提示
+            const categoryHint = generateCategoryHint();
+            searchBox.placeholder = categoryHint;
+        }
+    }
+}
+
+// 生成分类提示
+function generateCategoryHint() {
+    if (allCategoryPaths.size === 0) {
+        return t("categoryPlaceholderDefault");
+    }
+    
+    // 获取书签数据中的分类
+    const dataCategories = new Set();
+    allBookmarkData.forEach(bookmark => {
+        if (bookmark.folder) {
+            dataCategories.add(bookmark.folder);
+        }
+    });
+    
+    // 优先使用书签数据中的分类
+    const categories = dataCategories.size > 0 ? dataCategories : allCategoryPaths;
+    
+    // 找一个最短的分类路径作为示例
+    const sortedCategories = Array.from(categories).sort((a, b) => a.length - b.length);
+    const example = sortedCategories[0] || "A";
+    
+    // 如果示例包含/，说明是子分类
+    if (example.includes("/")) {
+        const parts = example.split("/");
+        return t("categoryPlaceholderWithPath", [parts[0], parts.slice(0, 2).join("/")]);
+    }
+    
+    return t("categoryPlaceholderSimple", [example]);
+}
+
+// 性能优化：批量获取所有书签，建立URL映射，并获取分类路径信息
 function getAllBookmarks() {
     return new Promise((resolve) => {
         chrome.bookmarks.getTree((bookmarkTreeNodes) => {
             const urlMap = new Map();
+            const categoryPaths = new Set();
             
             function isRootContainer(title) {
                 return [
@@ -300,30 +373,36 @@ function getAllBookmarks() {
                 ].includes(title);
             }
             
-            function traverse(nodes, currentTopLevel = null, inRoot = false) {
+            function traverse(nodes, currentPath = [], inRoot = false) {
                 nodes.forEach((node) => {
                     if (node.url) {
+                        const folderPath = currentPath.length > 0 ? currentPath.join("/") : "其他";
                         urlMap.set(node.url, {
                             title: node.title,
                             id: node.id,
-                            folder: currentTopLevel || "其他"
+                            folder: currentPath[0] || "其他",
+                            folderPath: folderPath
                         });
+                        if (currentPath.length > 0) {
+                            categoryPaths.add(folderPath);
+                        }
                     } else {
                         const title = node.title;
                         const isRoot = isRootContainer(title);
                         if (node.children) {
                             if (isRoot) {
-                                traverse(node.children, null, true);
+                                traverse(node.children, [], true);
                             } else {
-                                const nextTopLevel = currentTopLevel || (inRoot ? title : currentTopLevel || title);
-                                traverse(node.children, nextTopLevel, false);
+                                const newPath = inRoot ? [title] : [...currentPath, title];
+                                traverse(node.children, newPath, false);
                             }
                         }
                     }
                 });
             }
             
-            traverse(bookmarkTreeNodes, null, false);
+            traverse(bookmarkTreeNodes, [], false);
+            allCategoryPaths = categoryPaths;
             resolve(urlMap);
         });
     });
@@ -372,6 +451,7 @@ async function loadAndDisplayData() {
                     url: url,
                     title: bookmarkInfo.title,
                     folder: bookmarkInfo.folder || "其他",
+                    folderPath: bookmarkInfo.folderPath || bookmarkInfo.folder || "其他",
                     clicks: count,
                     firstClick: typeof value === "object" ? value.firstClick : null,
                     lastClick: typeof value === "object" ? value.lastClick : null,
@@ -394,6 +474,7 @@ async function loadAndDisplayData() {
             displayBookmarkList();
             updateSortHeaders();
             updateFilterChips();
+            updateModeToggleUI();
         } catch (error) {
             console.error('加载数据时出错:', error);
             bookmarkList.innerHTML = `<tr><td colspan='5' style='text-align: center; padding: 20px; color: #d32f2f;'>${t("errorLoadData")}</td></tr>`;
@@ -493,10 +574,21 @@ function displayBookmarkList() {
     // 搜索过滤
     let filteredData = allBookmarkData;
     if (currentSearchQuery) {
-        filteredData = filteredData.filter(bookmark => 
-            bookmark.title.toLowerCase().includes(currentSearchQuery) ||
-            bookmark.url.toLowerCase().includes(currentSearchQuery)
-        );
+        if (currentSearchMode === "category") {
+            // 分类模式：按分类路径过滤
+            filteredData = filteredData.filter(bookmark => {
+                const folderPath = bookmark.folderPath || bookmark.folder || "";
+                // 支持部分匹配，如输入"A"匹配"A"和"A/B"
+                return folderPath.toLowerCase().startsWith(currentSearchQuery.toLowerCase()) ||
+                       folderPath.toLowerCase().includes("/" + currentSearchQuery.toLowerCase());
+            });
+        } else {
+            // 书签模式：按标题或URL过滤
+            filteredData = filteredData.filter(bookmark => 
+                bookmark.title.toLowerCase().includes(currentSearchQuery) ||
+                bookmark.url.toLowerCase().includes(currentSearchQuery)
+            );
+        }
     }
     
     // 分类筛选
@@ -563,8 +655,20 @@ function displayBookmarkList() {
     // 更新统计信息
     updateStats(filteredData);
     
-    // 更新图表
-    updateCharts(filteredData);
+    // 更新图表 - 搜索时隐藏图表和统计面板
+    const chartsSection = document.querySelector('.charts-section');
+    const statsPanel = document.getElementById('statsPanel');
+    
+    if (currentSearchQuery) {
+        // 搜索模式下隐藏图表和统计面板
+        if (chartsSection) chartsSection.style.display = 'none';
+        if (statsPanel) statsPanel.style.display = 'none';
+    } else {
+        // 非搜索模式下显示图表和统计面板
+        if (chartsSection) chartsSection.style.display = 'block';
+        if (statsPanel) statsPanel.style.display = 'block';
+        updateCharts(filteredData);
+    }
     
     // 清空列表
     bookmarkList.innerHTML = "";
@@ -822,9 +926,9 @@ function updateCharts(data) {
 
 // 更新统计信息
 function updateStats(data) {
-    const totalBookmarks = data.length;
+    const trackedBookmarks = data.length;
     const totalClicks = data.reduce((sum, bookmark) => sum + bookmark.clicks, 0);
-    const avgClicks = totalBookmarks > 0 ? (totalClicks / totalBookmarks).toFixed(1) : 0;
+    const avgClicks = trackedBookmarks > 0 ? (totalClicks / trackedBookmarks).toFixed(1) : 0;
     
     // 统计分类数和访问最多的分类
     const folders = new Set();
@@ -850,7 +954,27 @@ function updateStats(data) {
         }
     });
     
-    document.getElementById("totalBookmarks").textContent = totalBookmarks;
+    // 获取书签管理器中的实际书签总数
+    chrome.bookmarks.getTree((bookmarkTreeNodes) => {
+        let actualTotal = 0;
+        function countBookmarks(nodes) {
+            nodes.forEach((node) => {
+                if (node.url && node.url.startsWith("http")) {
+                    actualTotal++;
+                }
+                if (node.children) {
+                    countBookmarks(node.children);
+                }
+            });
+        }
+        countBookmarks(bookmarkTreeNodes);
+        
+        // 更新显示格式: tracked/actual
+        const totalBookmarksEl = document.getElementById("totalBookmarks");
+        totalBookmarksEl.textContent = `${trackedBookmarks}/${actualTotal}`;
+        totalBookmarksEl.title = `${t("trackedBookmarks")}: ${trackedBookmarks}\n${t("actualBookmarks")}: ${actualTotal}`;
+    });
+    
     document.getElementById("totalClicks").textContent = totalClicks;
     document.getElementById("avgClicks").textContent = avgClicks;
     document.getElementById("totalFolders").textContent = totalFolders;
@@ -940,7 +1064,7 @@ function cleanDeletedBookmarks() {
         });
         
         if (deletedCount === 0) {
-            alert(t("emptyNoData"));
+            alert(t("noDeletedBookmarks"));
             return;
         }
         
@@ -948,6 +1072,68 @@ function cleanDeletedBookmarks() {
             chrome.storage.local.set({ clickCounts: cleanedCounts }, () => {
                 loadAndDisplayData();
                 alert(t("batchResetSuccess", [String(deletedCount)]));
+            });
+        }
+    });
+}
+
+// 合并书签
+function mergeBookmarks() {
+    const sourceUrl = prompt(t("promptMergeSource"));
+    if (!sourceUrl || !sourceUrl.trim()) return;
+    
+    const sourceTrimmed = sourceUrl.trim();
+    
+    const targetUrl = prompt(t("promptMergeTarget"));
+    if (!targetUrl || !targetUrl.trim()) return;
+    
+    const targetTrimmed = targetUrl.trim();
+    
+    if (sourceTrimmed === targetTrimmed) {
+        alert(t("mergeSameUrl"));
+        return;
+    }
+    
+    chrome.storage.local.get("clickCounts", (data) => {
+        const clickCounts = data.clickCounts || {};
+        
+        const sourceData = clickCounts[sourceTrimmed];
+        const targetData = clickCounts[targetTrimmed];
+        
+        if (!sourceData) {
+            alert(t("mergeSourceNotFound"));
+            return;
+        }
+        
+        const sourceCount = typeof sourceData === "number" ? sourceData : (sourceData.count || 0);
+        const targetCount = targetData ? (typeof targetData === "number" ? targetData : (targetData.count || 0)) : 0;
+        
+        const sourceFirstClick = typeof sourceData === "object" ? sourceData.firstClick : null;
+        const sourceLastClick = typeof sourceData === "object" ? sourceData.lastClick : null;
+        const targetFirstClick = targetData && typeof targetData === "object" ? targetData.firstClick : null;
+        const targetLastClick = targetData && typeof targetData === "object" ? targetData.lastClick : null;
+        
+        // 合并计数
+        const mergedCount = sourceCount + targetCount;
+        
+        // 合并时间戳
+        const mergedFirstClick = [sourceFirstClick, targetFirstClick].filter(Boolean).length > 0 
+            ? Math.min(...[sourceFirstClick, targetFirstClick].filter(Boolean)) 
+            : Date.now();
+        const mergedLastClick = Math.max(sourceLastClick || 0, targetLastClick || 0) || Date.now();
+        
+        if (confirm(t("confirmMerge", [sourceTrimmed, targetTrimmed, String(sourceCount), String(targetCount), String(mergedCount)]))) {
+            // 删除源书签数据，合并到目标书签
+            delete clickCounts[sourceTrimmed];
+            clickCounts[targetTrimmed] = {
+                count: mergedCount,
+                firstClick: mergedFirstClick,
+                lastClick: mergedLastClick
+            };
+            
+            chrome.storage.local.set({ clickCounts }, () => {
+                loadAndDisplayData();
+                alert(t("mergeSuccess"));
             });
         }
     });
@@ -1128,7 +1314,12 @@ function t(key, substitutions) {
 function substitute(str, substitutions) {
     if (Array.isArray(substitutions) && substitutions.length) {
         let s = String(str);
-        s = s.replace("$COUNT", substitutions[0]).replace("$URL", substitutions[0]);
+        // 支持多个占位符: $URL, $TARGET, $COUNT, $COUNT2, $COUNT3
+        s = s.replace("$URL", substitutions[0] || "");
+        s = s.replace("$TARGET", substitutions[1] || "");
+        s = s.replace("$COUNT", substitutions[2] || substitutions[0] || "");
+        s = s.replace("$COUNT2", substitutions[3] || "");
+        s = s.replace("$COUNT3", substitutions[4] || "");
         return s;
     }
     return str;
@@ -1194,10 +1385,25 @@ const defaultI18nZhCN = {
     csvHeaderLastAccess: "最后访问",
     exportNoData: "没有数据可导出",
     chartDatasetClicks: "点击次数",
-    timeDaysAgo: "$COUNT天前",
-    timeHoursAgo: "$COUNT小时前",
-    timeMinutesAgo: "$COUNT分钟前",
-    timeJustNow: "刚刚"
+    timeDaysAgo: "$COUNT天",
+    timeHoursAgo: "$COUNT小时",
+    timeMinutesAgo: "$COUNT分钟",
+    timeJustNow: "刚刚",
+    noDeletedBookmarks: "没有已删除的书签",
+    menuMergeBookmarks: "合并书签",
+    promptMergeSource: "请输入要合并的书签URL（源URL，数据将被合并到目标URL）:",
+    promptMergeTarget: "请输入目标书签URL（源URL的数据将合并到此URL）:",
+    mergeSameUrl: "源URL和目标URL不能相同",
+    mergeSourceNotFound: "未找到源URL的点击数据",
+    confirmMerge: "确定要将以下书签合并吗？\n源URL: $URL\n目标URL: $TARGET\n源点击次数: $COUNT → 目标点击次数: $COUNT2\n合并后点击次数: $COUNT3",
+    mergeSuccess: "合并成功",
+    modeBookmark: "书签",
+    modeCategory: "分类",
+    categoryPlaceholderDefault: "请输入分类，如 A 或 A/B",
+    categoryPlaceholderSimple: "请输入分类，如 $URL",
+    categoryPlaceholderWithPath: "请输入分类，如 $URL 或 $TARGET",
+    trackedBookmarks: "统计到",
+    actualBookmarks: "实际总数"
 };
 
 // 英文默认文案
@@ -1260,10 +1466,25 @@ const defaultI18nEn = {
     csvHeaderLastAccess: "Last Access",
     exportNoData: "No data to export",
     chartDatasetClicks: "Clicks",
-    timeDaysAgo: "$COUNT days ago",
-    timeHoursAgo: "$COUNT hours ago",
-    timeMinutesAgo: "$COUNT minutes ago",
-    timeJustNow: "Just now"
+    timeDaysAgo: "$COUNT days",
+    timeHoursAgo: "$COUNT hours",
+    timeMinutesAgo: "$COUNT minutes",
+    timeJustNow: "Just now",
+    noDeletedBookmarks: "No deleted bookmarks found",
+    menuMergeBookmarks: "Merge Bookmarks",
+    promptMergeSource: "Enter the source bookmark URL (data will be merged to target):",
+    promptMergeTarget: "Enter the target bookmark URL (source data will be merged here):",
+    mergeSameUrl: "Source and target URLs cannot be the same",
+    mergeSourceNotFound: "No click data found for source URL",
+    confirmMerge: "Merge the following bookmarks?\nSource: $URL\nTarget: $TARGET\nSource clicks: $COUNT → Target clicks: $COUNT2\nCombined clicks: $COUNT3",
+    mergeSuccess: "Merge successful",
+    modeBookmark: "Bookmark",
+    modeCategory: "Category",
+    categoryPlaceholderDefault: "Enter category, e.g. A or A/B",
+    categoryPlaceholderSimple: "Enter category, e.g. $URL",
+    categoryPlaceholderWithPath: "Enter category, e.g. $URL or $TARGET",
+    trackedBookmarks: "Tracked",
+    actualBookmarks: "Total"
 };
 // 初始化静态UI文案
 function initI18n() {
@@ -1276,6 +1497,7 @@ function initI18n() {
         exportCSV: "menuExportCSV",
         exportJSON: "menuExportJSON",
         resetSpecific: "menuResetSpecific",
+        mergeBookmarks: "menuMergeBookmarks",
         cleanDeleted: "menuCleanDeleted",
         clearAll: "menuClearAll",
         batchReset: "batchReset",

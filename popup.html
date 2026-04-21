@@ -29,10 +29,11 @@
             overflow-x: hidden;
             padding-bottom: 60px;
             /* Space for batch actions */
+            scroll-behavior: auto;
         }
 
         .header {
-            padding: 16px;
+            padding: 12px 16px;
             background-color: #fff;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             margin-bottom: 8px;
@@ -71,10 +72,33 @@
             color: rgba(0, 0, 0, 0.38);
         }
 
+        .mode-toggle {
+            padding: 4px 8px;
+            border: 1px solid rgba(0, 0, 0, 0.12);
+            border-radius: 4px;
+            background-color: #fff;
+            cursor: pointer;
+            font-size: 11px;
+            color: rgba(0, 0, 0, 0.6);
+            white-space: nowrap;
+            transition: all 0.2s ease;
+        }
+
+        .mode-toggle:hover {
+            background-color: rgba(0, 0, 0, 0.04);
+            border-color: rgba(0, 0, 0, 0.3);
+        }
+
+        .mode-toggle.active {
+            background-color: #1976d2;
+            color: #fff;
+            border-color: #1976d2;
+        }
+
         .filter-container {
             display: flex;
             gap: 8px;
-            margin-bottom: 12px;
+            margin-bottom: 8px;
             align-items: center;
         }
 
@@ -174,7 +198,7 @@
             display: flex;
             gap: 8px;
             align-items: center;
-            margin-bottom: 12px;
+            margin-bottom: 0;
         }
 
         .date-filter-label {
@@ -242,10 +266,8 @@
             padding: 0 16px 16px;
         }
 
-        .stats-header {
-            display: flex;
-            align-items: flex-start;
-            gap: 16px;
+        .stats-section {
+            padding: 0 16px 16px;
         }
 
         .stats {
@@ -272,6 +294,11 @@
         .stats-row span:last-child {
             font-weight: 500;
             color: #1976d2;
+        }
+
+        .bookmark-count-tooltip {
+            cursor: help;
+            position: relative;
         }
 
         button {
@@ -683,6 +710,7 @@
 <body>
     <div class="search-container">
         <input type="text" id="searchBox" class="search-box" placeholder="搜索书签标题或URL...">
+        <button id="modeToggle" class="mode-toggle" title="切换搜索模式">书签</button>
         <div class="menu-container">
             <button id="menuButton" class="menu-button">⋮</button>
             <div class="dropdown-menu" id="dropdownMenu">
@@ -691,6 +719,7 @@
                 <button id="exportCSV">导出 CSV</button>
                 <button id="exportJSON">导出 JSON</button>
                 <button id="resetSpecific">重置指定计数</button>
+                <button id="mergeBookmarks">合并书签</button>
                 <button id="cleanDeleted">清理已删除书签</button>
                 <button id="clearAll">清空所有数据</button>
                 <button id="languageMenuToggle">🌐 语言</button>
@@ -733,28 +762,28 @@
                     <option value="year">最近1年</option>
                 </select>
             </div>
-            <div class="stats-header">
-                <div class="stats" id="statsPanel">
-                    <div class="stats-row">
-                        <span>总书签数:</span>
-                        <span id="totalBookmarks">0</span>
-                    </div>
-                    <div class="stats-row">
-                        <span>总点击次数:</span>
-                        <span id="totalClicks">0</span>
-                    </div>
-                    <div class="stats-row">
-                        <span>平均点击次数:</span>
-                        <span id="avgClicks">0</span>
-                    </div>
-                    <div class="stats-row">
-                        <span>分类数:</span>
-                        <span id="totalFolders">0</span>
-                    </div>
-                    <div class="stats-row">
-                        <span>访问最多的分类:</span>
-                        <span id="topFolder">-</span>
-                    </div>
+        </div>
+        <div class="stats-section">
+            <div class="stats" id="statsPanel">
+                <div class="stats-row">
+                    <span>总书签数:</span>
+                    <span id="totalBookmarks" class="bookmark-count-tooltip" title="">0</span>
+                </div>
+                <div class="stats-row">
+                    <span>总点击次数:</span>
+                    <span id="totalClicks">0</span>
+                </div>
+                <div class="stats-row">
+                    <span>平均点击次数:</span>
+                    <span id="avgClicks">0</span>
+                </div>
+                <div class="stats-row">
+                    <span>分类数:</span>
+                    <span id="totalFolders">0</span>
+                </div>
+                <div class="stats-row">
+                    <span>访问最多的分类:</span>
+                    <span id="topFolder">-</span>
                 </div>
             </div>
         </div>
