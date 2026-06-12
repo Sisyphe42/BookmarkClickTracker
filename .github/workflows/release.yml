@@ -333,7 +333,7 @@ jobs:
             done
           fi
 
-          if [[ "$upload_state" != "SUCCESS" ]]; then
+          if [[ "$upload_state" != "SUCCEEDED" && "$upload_state" != "SUCCESS" ]]; then
             echo "::error::Chrome Web Store upload did not complete successfully. uploadState=$upload_state"
             exit 1
           fi
