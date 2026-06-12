@@ -1,0 +1,353 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Release tag. Defaults to v<manifest version>."
+        required: false
+        type: string
+      draft:
+        description: "Create the GitHub release as a draft."
+        required: false
+        default: false
+        type: boolean
+      publish_chrome:
+        description: "Upload and publish the package to the Chrome Web Store."
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+env:
+  EXTENSION_ID: hkckkffjpagdelncgojglkmbomjgnogk
+  PUBLISHER_ID: ${{ vars.CHROME_WEBSTORE_PUBLISHER_ID || '7ef8f2de-4b08-4f79-bee2-9a84be244919' }}
+  PACKAGE_BASENAME: BookmarkClickTracker
+
+jobs:
+  release:
+    name: Package and release extension
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Read release metadata
+        id: meta
+        shell: bash
+        env:
+          INPUT_TAG_NAME: ${{ github.event.inputs.tag_name || '' }}
+          INPUT_DRAFT: ${{ github.event.inputs.draft || 'false' }}
+          INPUT_PUBLISH_CHROME: ${{ github.event.inputs.publish_chrome || 'false' }}
+          AUTO_PUBLISH_CHROME: ${{ vars.PUBLISH_CHROME_WEBSTORE }}
+        run: |
+          set -euo pipefail
+
+          version="$(jq -r '.version // empty' manifest.json)"
+          if [[ -z "$version" ]]; then
+            echo "::error::manifest.json does not contain a version"
+            exit 1
+          fi
+
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" && -n "$INPUT_TAG_NAME" ]]; then
+            release_tag="$INPUT_TAG_NAME"
+          elif [[ "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
+            release_tag="$GITHUB_REF_NAME"
+          else
+            release_tag="v$version"
+          fi
+
+          draft=false
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" && "$INPUT_DRAFT" == "true" ]]; then
+            draft=true
+          fi
+
+          publish_chrome=false
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" && "$INPUT_PUBLISH_CHROME" == "true" ]]; then
+            publish_chrome=true
+          elif [[ "$GITHUB_EVENT_NAME" == "push" && "$AUTO_PUBLISH_CHROME" == "true" ]]; then
+            publish_chrome=true
+          fi
+
+          zip_name="${PACKAGE_BASENAME}-${release_tag}.zip"
+
+          {
+            echo "version=$version"
+            echo "release_tag=$release_tag"
+            echo "draft=$draft"
+            echo "publish_chrome=$publish_chrome"
+            echo "zip_name=$zip_name"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Validate extension manifest and locale files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          jq empty manifest.json
+          jq empty _locales/en/messages.json
+          jq empty _locales/zh_CN/messages.json
+
+          required_files=(
+            manifest.json
+            background.js
+            popup.html
+            popup.js
+            chart.umd.min.js
+            icon16.png
+            icon48.png
+            icon128.png
+            _locales/en/messages.json
+            _locales/zh_CN/messages.json
+            assets/fold.svg
+            assets/expand.svg
+          )
+
+          for file in "${required_files[@]}"; do
+            if [[ ! -f "$file" ]]; then
+              echo "::error::Missing required extension file: $file"
+              exit 1
+            fi
+          done
+
+      - name: Stage extension package
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          rm -rf dist
+          mkdir -p "dist/$PACKAGE_BASENAME"
+
+          cp manifest.json background.js popup.html popup.js chart.umd.min.js \
+            icon16.png icon48.png icon128.png "dist/$PACKAGE_BASENAME/"
+          cp -R _locales assets "dist/$PACKAGE_BASENAME/"
+
+          find "dist/$PACKAGE_BASENAME" -type f -print | sort
+
+      - name: Create extension zip
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          (
+            cd "dist/$PACKAGE_BASENAME"
+            zip -r "../${{ steps.meta.outputs.zip_name }}" .
+          )
+
+          sha256sum "dist/${{ steps.meta.outputs.zip_name }}" > "dist/${{ steps.meta.outputs.zip_name }}.sha256"
+
+      - name: Upload packaged extension artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.zip_name }}
+          path: |
+            dist/${{ steps.meta.outputs.zip_name }}
+            dist/${{ steps.meta.outputs.zip_name }}.sha256
+          if-no-files-found: error
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.release_tag }}
+          target_commitish: ${{ github.sha }}
+          name: Bookmark Click Tracker ${{ steps.meta.outputs.release_tag }}
+          draft: ${{ steps.meta.outputs.draft }}
+          prerelease: ${{ contains(steps.meta.outputs.release_tag, '-') }}
+          generate_release_notes: true
+          files: |
+            dist/${{ steps.meta.outputs.zip_name }}
+            dist/${{ steps.meta.outputs.zip_name }}.sha256
+          fail_on_unmatched_files: true
+
+      - name: Get Chrome Web Store access token
+        id: chrome_auth
+        if: ${{ steps.meta.outputs.publish_chrome == 'true' }}
+        shell: bash
+        env:
+          SERVICE_ACCOUNT_JSON: ${{ secrets.CHROME_WEBSTORE_SERVICE_ACCOUNT_JSON }}
+          CLIENT_ID: ${{ secrets.CHROME_WEBSTORE_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CHROME_WEBSTORE_CLIENT_SECRET }}
+          REFRESH_TOKEN: ${{ secrets.CHROME_WEBSTORE_REFRESH_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          base64url() {
+            openssl base64 -A | tr '+/' '-_' | tr -d '='
+          }
+
+          access_token=""
+
+          if [[ -n "$SERVICE_ACCOUNT_JSON" ]]; then
+            service_account_file="$(mktemp)"
+            private_key_file="$(mktemp)"
+            token_response="$(mktemp)"
+
+            printf '%s' "$SERVICE_ACCOUNT_JSON" > "$service_account_file"
+
+            client_email="$(jq -r '.client_email // empty' "$service_account_file")"
+            private_key="$(jq -r '.private_key // empty' "$service_account_file")"
+            token_uri="$(jq -r '.token_uri // "https://oauth2.googleapis.com/token"' "$service_account_file")"
+
+            if [[ -z "$client_email" || -z "$private_key" ]]; then
+              echo "::error::CHROME_WEBSTORE_SERVICE_ACCOUNT_JSON must contain client_email and private_key"
+              exit 1
+            fi
+
+            printf '%s' "$private_key" > "$private_key_file"
+            chmod 600 "$private_key_file"
+
+            now="$(date +%s)"
+            exp="$((now + 3600))"
+            scope="https://www.googleapis.com/auth/chromewebstore"
+
+            header="$(jq -cn '{alg:"RS256",typ:"JWT"}' | base64url)"
+            claim="$(
+              jq -cn \
+                --arg iss "$client_email" \
+                --arg scope "$scope" \
+                --arg aud "$token_uri" \
+                --argjson iat "$now" \
+                --argjson exp "$exp" \
+                '{iss:$iss,scope:$scope,aud:$aud,iat:$iat,exp:$exp}' | base64url
+            )"
+            unsigned_token="$header.$claim"
+            signature="$(printf '%s' "$unsigned_token" | openssl dgst -sha256 -sign "$private_key_file" | base64url)"
+            assertion="$unsigned_token.$signature"
+
+            token_status="$(
+              curl -sS -o "$token_response" -w "%{http_code}" \
+                -X POST "$token_uri" \
+                --data-urlencode "grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer" \
+                --data-urlencode "assertion=$assertion"
+            )"
+
+            rm -f "$service_account_file" "$private_key_file"
+
+            if [[ "$token_status" != "200" ]]; then
+              cat "$token_response"
+              echo "::error::Failed to obtain Chrome Web Store access token with service account"
+              exit 1
+            fi
+
+            access_token="$(jq -r '.access_token // empty' "$token_response")"
+          else
+            missing=()
+            for name in CLIENT_ID CLIENT_SECRET REFRESH_TOKEN; do
+              if [[ -z "${!name}" ]]; then
+                missing+=("$name")
+              fi
+            done
+
+            if (( ${#missing[@]} > 0 )); then
+              echo "::error::Missing Chrome Web Store credentials. Preferred: CHROME_WEBSTORE_SERVICE_ACCOUNT_JSON. Fallback: ${missing[*]}"
+              exit 1
+            fi
+
+            token_response="$(mktemp)"
+            token_status="$(
+              curl -sS -o "$token_response" -w "%{http_code}" \
+                -X POST "https://oauth2.googleapis.com/token" \
+                --data-urlencode "client_id=$CLIENT_ID" \
+                --data-urlencode "client_secret=$CLIENT_SECRET" \
+                --data-urlencode "refresh_token=$REFRESH_TOKEN" \
+                --data-urlencode "grant_type=refresh_token"
+            )"
+
+            if [[ "$token_status" != "200" ]]; then
+              cat "$token_response"
+              echo "::error::Failed to refresh Chrome Web Store access token"
+              exit 1
+            fi
+
+            access_token="$(jq -r '.access_token // empty' "$token_response")"
+          fi
+
+          if [[ -z "$access_token" ]]; then
+            cat "$token_response"
+            echo "::error::OAuth token response did not include an access token"
+            exit 1
+          fi
+
+          echo "::add-mask::$access_token"
+          echo "access_token=$access_token" >> "$GITHUB_OUTPUT"
+
+      - name: Upload and publish to Chrome Web Store
+        if: ${{ steps.meta.outputs.publish_chrome == 'true' }}
+        shell: bash
+        env:
+          ACCESS_TOKEN: ${{ steps.chrome_auth.outputs.access_token }}
+          ZIP_FILE: dist/${{ steps.meta.outputs.zip_name }}
+        run: |
+          set -euo pipefail
+
+          access_token="$ACCESS_TOKEN"
+          if [[ -z "$access_token" ]]; then
+            echo "::error::Chrome Web Store access token was not created"
+            exit 1
+          fi
+
+          upload_response="$(mktemp)"
+          upload_status="$(
+            curl -sS -o "$upload_response" -w "%{http_code}" \
+              -X POST \
+              -H "Authorization: Bearer $access_token" \
+              -T "$ZIP_FILE" \
+              "https://chromewebstore.googleapis.com/upload/v2/publishers/$PUBLISHER_ID/items/$EXTENSION_ID:upload"
+          )"
+          cat "$upload_response"
+
+          if [[ "$upload_status" != 2* ]]; then
+            echo "::error::Chrome Web Store upload failed with HTTP $upload_status"
+            exit 1
+          fi
+
+          upload_state="$(jq -r '.uploadState // empty' "$upload_response")"
+          if [[ "$upload_state" == "UPLOAD_IN_PROGRESS" ]]; then
+            for attempt in {1..12}; do
+              sleep 10
+
+              status_response="$(mktemp)"
+              status_code="$(
+                curl -sS -o "$status_response" -w "%{http_code}" \
+                  -X GET \
+                  -H "Authorization: Bearer $access_token" \
+                  "https://chromewebstore.googleapis.com/v2/publishers/$PUBLISHER_ID/items/$EXTENSION_ID:fetchStatus"
+              )"
+              cat "$status_response"
+
+              if [[ "$status_code" != 2* ]]; then
+                echo "::error::Chrome Web Store fetchStatus failed with HTTP $status_code"
+                exit 1
+              fi
+
+              upload_state="$(jq -r '.uploadState // empty' "$status_response")"
+              if [[ "$upload_state" != "UPLOAD_IN_PROGRESS" ]]; then
+                break
+              fi
+            done
+          fi
+
+          if [[ "$upload_state" != "SUCCESS" ]]; then
+            echo "::error::Chrome Web Store upload did not complete successfully. uploadState=$upload_state"
+            exit 1
+          fi
+
+          publish_response="$(mktemp)"
+          publish_status="$(
+            curl -sS -o "$publish_response" -w "%{http_code}" \
+              -X POST \
+              -H "Authorization: Bearer $access_token" \
+              "https://chromewebstore.googleapis.com/v2/publishers/$PUBLISHER_ID/items/$EXTENSION_ID:publish"
+          )"
+          cat "$publish_response"
+
+          if [[ "$publish_status" != 2* ]]; then
+            echo "::error::Chrome Web Store publish failed with HTTP $publish_status"
+            exit 1
+          fi

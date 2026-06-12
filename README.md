@@ -4,7 +4,7 @@
 
 A Chrome extension that tracks how often you use bookmarks.
 
-## Features (Concise)
+## Features
 
 - Track clicks per bookmark
 - Stats: total, average, folders, top folder
@@ -14,7 +14,7 @@ A Chrome extension that tracks how often you use bookmarks.
 - Export CSV/JSON
 - Language switch (English/中文)
 
-## Usage (Concise)
+## Usage
 
 - Click the toolbar icon to open the popup
 - Search, filter, and sort to explore stats

@@ -1,0 +1,8 @@
+opencode.json
+.playwright-mcp/
+dist/
+*.zip
+oauth-client*.json
+chrome-webstore-token*.json
+service-account*.json
+chrome-webstore-service-account*.json
