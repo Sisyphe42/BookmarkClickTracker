@@ -1,0 +1,53 @@
+name: Deploy Privacy Policy
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - bookmark-click-tracker-privacy.html
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    name: Deploy to sisyphe42.github.io
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out BookmarkClickTracker
+        uses: actions/checkout@v4
+        with:
+          path: source
+
+      - name: Check out sisyphe42.github.io
+        uses: actions/checkout@v4
+        with:
+          repository: sisyphe42/sisyphe42.github.io
+          token: ${{ secrets.GH_PAGES_PAT }}
+          path: target
+
+      - name: Copy privacy policy file
+        shell: bash
+        run: |
+          cp source/bookmark-click-tracker-privacy.html target/bookmark-click-tracker-privacy.html
+
+      - name: Commit and push
+        shell: bash
+        working-directory: target
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if git diff --quiet; then
+            echo "No changes to deploy"
+            exit 0
+          fi
+
+          git add bookmark-click-tracker-privacy.html
+          git commit -m "Update bookmark-click-tracker-privacy.html
+
+          Co-Authored-By: Oz <oz-agent@warp.dev>"
+          git push
