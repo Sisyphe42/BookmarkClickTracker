@@ -41,12 +41,13 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          if git diff --quiet; then
+          git add bookmark-click-tracker-privacy.html
+
+          if git diff --cached --quiet; then
             echo "No changes to deploy"
             exit 0
           fi
 
-          git add bookmark-click-tracker-privacy.html
           git commit -m "Update bookmark-click-tracker-privacy.html
 
           Co-Authored-By: Oz <oz-agent@warp.dev>"
