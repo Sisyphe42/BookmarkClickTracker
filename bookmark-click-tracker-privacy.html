@@ -51,14 +51,17 @@
           <h2>Processing & Storage</h2>
           <ul>
             <li>Stored locally in <code>chrome.storage.local</code></li>
-            <li>No remote upload, sync, or sharing</li>
+            <li>A one-time update migration may move legacy counts from Chrome Sync to local storage and remove the synchronized copy</li>
+            <li>No upload to the developer, analytics service, advertising service, or other third party</li>
           </ul>
 
           <h2>Permissions</h2>
           <ul>
             <li><code>bookmarks</code>: map stats to bookmarks</li>
             <li><code>storage</code>: save statistics locally</li>
+            <li><code>unlimitedStorage</code>: retain statistics for large bookmark collections without hitting the normal local quota</li>
             <li><code>webNavigation</code>: detect visits originating from bookmarks</li>
+            <li><code>history</code>: inspect visit transition information to improve counting accuracy</li>
             <li><code>&lt;all_urls&gt;</code>: ensure navigation listening across sites</li>
           </ul>
 
@@ -109,14 +112,17 @@
           <h2>处理与存储</h2>
           <ul>
             <li>数据仅存储在浏览器本地 <code>chrome.storage.local</code></li>
-            <li>不进行远程上传、同步或共享</li>
+            <li>扩展更新时可能会将旧版 Chrome 同步区中的计数一次性迁移到本地存储，并删除同步副本</li>
+            <li>不向开发者、分析服务、广告服务或其他第三方上传数据</li>
           </ul>
 
           <h2>权限说明</h2>
           <ul>
             <li><code>bookmarks</code>：将统计与书签对应</li>
             <li><code>storage</code>：在本地保存统计数据</li>
+            <li><code>unlimitedStorage</code>：为大型书签库长期保存统计数据，避免达到常规本地存储上限</li>
             <li><code>webNavigation</code>：识别通过书签发起的访问</li>
+            <li><code>history</code>：读取访问来源信息，以提升计数准确性</li>
             <li><code>&lt;all_urls&gt;</code>：确保跨站点监听导航以准确统计</li>
           </ul>
 
