@@ -2,6 +2,14 @@
 
 > Last Updated: 2026-09-15
 
+> This file is the repository's source of truth for listing content. Chrome Web Store does not parse or import it, and it is intentionally excluded from the extension package. Copy the relevant fields and upload the listed graphics in the Chrome Web Store Developer Dashboard.
+
+## Dashboard Sync Status
+
+- Package version 2.2 was uploaded and submitted by the `v2.2` release workflow.
+- Detailed descriptions and store screenshots still require manual synchronization in the Developer Dashboard's **Store listing** tab.
+- Privacy declarations and permission justifications still require manual synchronization in the **Privacy practices** tab.
+
 ## Store Listing
 
 **Extension Name**
@@ -99,14 +107,16 @@ English (with Simplified Chinese localization)
 | Asset | Dimensions | Status | Filename |
 |-------|-----------|--------|----------|
 | Store Icon | 128×128 PNG | Ready | `icon128.png` |
-| Screenshot 1 | 1280×800 PNG | Ready | `store-assets/preview-1-1280x800.png` |
-| Screenshot 2 | 1280×800 PNG | Ready | `store-assets/preview-2-1280x800.png` |
+| Screenshot 1 | 1280×800 or 640×400 | Not created | |
+| Screenshot 2 | 1280×800 or 640×400 | Not created | |
 | Small Promo Tile | 440×280 | Not created | |
 | Marquee Promo Tile | 1400×560 | Not created | |
 
 ### Screenshot Notes
 
-Both store screenshots are faithful 1280×800 crops derived from the two images embedded in `README.md`: the statistics dashboard and the actions/language menu.
+The previous derived crops were removed because they did not meet the listing requirements. New screenshots must show the current extension UI, fill the entire canvas, and use an accepted 1280×800 or 640×400 size before they are uploaded manually in the Developer Dashboard.
+
+The README install link embeds Google's official 206×58 Chrome Web Store badge from the Chrome for Developers CDN. This badge is repository documentation artwork, not a Store listing upload asset.
 
 ## Permissions Justification
 
@@ -171,7 +181,7 @@ https://github.com/Sisyphe42/BookmarkClickTracker
 
 | Version | Date | Changes | Status |
 |---------|------|---------|--------|
-| 2.2 | 2026-09-15 | New logo and refreshed Chrome Web Store description and screenshots. | Draft |
+| 2.2 | 2026-09-15 | New logo and refreshed Chrome Web Store listing copy. | Submitted |
 | 2.1 | 2026-09-14 | Search UX improvements, bookmark-stat merging, privacy policy, and automated release workflow. | Published |
 
 ## Review Notes

@@ -81,6 +81,8 @@ GET https://chromewebstore.googleapis.com/v2/publishers/$PUBLISHER_ID/items/$EXT
 3. GitHub Actions creates `BookmarkClickTracker-<tag>.zip` and attaches it to a GitHub Release.
 4. If `PUBLISH_CHROME_WEBSTORE=true` and Chrome Web Store credentials exist, the workflow uploads and publishes the zip.
 
+The Chrome Web Store API does not import `CHROMEWEBSTORE.md` or update listing metadata. Detailed descriptions, screenshots, privacy declarations, and other listing fields must be synchronized manually in the Chrome Web Store Developer Dashboard. `CHROMEWEBSTORE.md` is the copy-ready source of truth for that work.
+
 The Web Store package includes only:
 
 - `manifest.json`

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="icon128.png" width="128" height="128" alt="书签点击统计 Logo">
+  <img src="icon128.png" width="128" height="128" alt="书签点击统计图标">
 </p>
 
 # 书签点击统计
@@ -8,7 +8,11 @@
 
 书签点击统计会记录你真正使用过的书签，帮助你看清常用链接与文件夹，并整理不断增长的书签库。
 
-[前往 Chrome 应用商店安装](https://chromewebstore.google.com/detail/bookmark-click-tracker/hkckkffjpagdelncgojglkmbomjgnogk)
+<p align="center">
+  <a href="https://chromewebstore.google.com/detail/bookmark-click-tracker/hkckkffjpagdelncgojglkmbomjgnogk">
+    <img src="https://developer.chrome.com/static/docs/webstore/branding/image/tbyBjqi7Zu733AAKA5n4.png" width="206" height="58" alt="Chrome 应用商店提供">
+  </a>
+</p>
 
 ## 主要功能
 
@@ -48,8 +52,3 @@
 ## 支持与反馈
 
 如发现问题或有功能建议，请[提交 Issue](https://github.com/Sisyphe42/BookmarkClickTracker/issues)，或发送邮件至 [az0189re@gmail.com](mailto:az0189re@gmail.com)。
-
-## 2.2 版本
-
-- 启用全新 Logo
-- 更新 Chrome 应用商店说明与截图

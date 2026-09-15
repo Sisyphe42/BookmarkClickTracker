@@ -8,7 +8,11 @@
 
 Bookmark Click Tracker shows which saved links you actually use, helping you understand and organize a growing bookmark collection.
 
-[Install from the Chrome Web Store](https://chromewebstore.google.com/detail/bookmark-click-tracker/hkckkffjpagdelncgojglkmbomjgnogk)
+<p align="center">
+  <a href="https://chromewebstore.google.com/detail/bookmark-click-tracker/hkckkffjpagdelncgojglkmbomjgnogk">
+    <img src="https://developer.chrome.com/static/docs/webstore/branding/image/tbyBjqi7Zu733AAKA5n4.png" width="206" height="58" alt="Available in the Chrome Web Store">
+  </a>
+</p>
 
 ## Features
 
@@ -48,8 +52,3 @@ See the full [Privacy Policy](bookmark-click-tracker-privacy.html).
 ## Support
 
 Found a bug or have a suggestion? [Open an issue](https://github.com/Sisyphe42/BookmarkClickTracker/issues) or email [az0189re@gmail.com](mailto:az0189re@gmail.com).
-
-## Version 2.2
-
-- Introduces a new logo
-- Refreshes the Chrome Web Store description and screenshots
